@@ -1,0 +1,72 @@
+name: newsclip
+description: 2030 세대를 위한 뉴스 앱
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # 상태 관리
+  provider: ^6.1.1
+  
+  # 로컬 저장소
+  shared_preferences: ^2.2.2
+  
+  # 네트워크
+  http: ^1.1.2
+  dio: ^5.4.0
+  
+  # 카드 스와이프 (틴더 스타일)
+  flutter_card_swiper: ^7.0.0
+  
+  # UI 컴포넌트
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
+  
+  # 소셜 로그인
+  kakao_flutter_sdk: ^1.9.0
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^6.1.0
+  
+  # 유틸리티
+  intl: ^0.19.0
+  url_launcher: ^6.2.3
+  share_plus: ^7.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  
+  fonts:
+    - family: Pretendard
+      fonts:
+        - asset: assets/fonts/Pretendard-Thin.otf
+          weight: 100
+        - asset: assets/fonts/Pretendard-ExtraLight.otf
+          weight: 200
+        - asset: assets/fonts/Pretendard-Light.otf
+          weight: 300
+        - asset: assets/fonts/Pretendard-Regular.otf
+          weight: 400
+        - asset: assets/fonts/Pretendard-Medium.otf
+          weight: 500
+        - asset: assets/fonts/Pretendard-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.otf
+          weight: 700
+        - asset: assets/fonts/Pretendard-ExtraBold.otf
+          weight: 800
+        - asset: assets/fonts/Pretendard-Black.otf
+          weight: 900
+  
+  assets:
+    - assets/images/
+    - assets/icons/

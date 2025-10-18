@@ -1,0 +1,64 @@
+# Flutter/Dart
+.dart_tool/
+.packages
+.pub-cache/
+build/
+coverage/
+*.lock
+
+# IDE / Editor
+.idea/
+.vscode/
+*.iml
+
+# iOS
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/.symlinks/
+ios/Pods/
+ios/Podfile.lock
+ios/Runner.xcworkspace/
+ios/DerivedData/
+ios/Flutter/App.framework
+ios/ServiceDefinitions.json
+
+# macOS
+macos/Flutter/ephemeral/
+macos/Pods/
+macos/Podfile.lock
+macos/Runner.xcworkspace/
+
+# Android
+android/.gradle/
+android/app/build/
+android/local.properties
+android/key.properties
+*.jks
+
+# Web build
+web/.dart_tool/
+web/build/
+
+# Linux
+linux/flutter/
+linux/obj/
+
+# Windows
+windows/flutter/
+windows/obj/
+
+# Assets cache (optional)
+*.tmp
+*.swp
+
+# Environment / Secrets
+.env
+*.env
+.env.*
+firebase_options.dart
+
+# Logs
+*.log
+
+# Generated
+pubspec.lock
