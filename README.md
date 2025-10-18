@@ -101,7 +101,7 @@ Database (PostgreSQL)
 
 | 항목 | 내용 |
 |------|------|
-| Base URL | `미정` |
+| Base URL | `https://newsclip.duckdns.org/v1` |
 | Auth | JWT 기반 인증 |
 | Data Format | JSON |
 | 주요 연동 기능 | 로그인 / 뉴스 조회 / 커뮤니티 / 북마크 / 알림 |
