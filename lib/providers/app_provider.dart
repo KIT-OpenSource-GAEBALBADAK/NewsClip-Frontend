@@ -125,6 +125,27 @@ class AppProvider with ChangeNotifier {
     
     notifyListeners();
   }
+
+  Future<void> setLoggedInFromEmail(String email) async {
+    _user = User(
+      id: DateTime.now().millisecondsSinceEpoch.toString(),
+      name: email.split('@').first,
+      email: email,
+      provider: 'local',
+    );
+    _isLoggedIn = true;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+    // await prefs.setString('user', jsonEncode({
+    //   'id': _user!.id,
+    //   'name': _user!.name,
+    //   'email': _user!.email,
+    //   'provider': _user!.provider,
+    // }));
+
+    notifyListeners();
+  }
   
   Future<void> logout() async {
     _user = null;
