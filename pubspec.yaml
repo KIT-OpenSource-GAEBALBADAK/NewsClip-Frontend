@@ -9,7 +9,6 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  
   # 상태 관리
   provider: ^6.1.1
   
