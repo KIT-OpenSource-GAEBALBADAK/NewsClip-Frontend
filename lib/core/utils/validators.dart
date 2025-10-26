@@ -1,7 +1,7 @@
 String? validateEmail(String? value) {
   if (value == null || value.trim().isEmpty) return '이메일을 입력하세요';
-  //final emailReg = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-  //if (!emailReg.hasMatch(value.trim())) return '유효한 이메일을 입력하세요';
+  final emailReg = RegExp(r'^[^@]+@[^@]+\.[^@]+');
+  if (!emailReg.hasMatch(value.trim())) return '유효한 이메일을 입력하세요';
   return null;
 }
 
