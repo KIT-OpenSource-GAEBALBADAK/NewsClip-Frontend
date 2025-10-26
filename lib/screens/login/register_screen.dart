@@ -155,10 +155,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
               // ✅ 아이디 필드 (이메일 → 아이디로 변경)
               TextFormField(
                 controller: _usernameCtrl,
-                decoration: _inputDecoration('아이디'),
+                decoration: _inputDecoration('이메일'),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return '아이디를 입력하세요';
+                    return '이메일을 입력하세요';
                   }
                   return null;
                 },
