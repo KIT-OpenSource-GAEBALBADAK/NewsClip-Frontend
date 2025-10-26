@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/app_provider.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_dimensions.dart';
+import 'email_login_screen.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -59,6 +60,23 @@ class LoginScreen extends StatelessWidget {
                   icon: const Icon(Icons.g_mobiledata, size: 24),
                   label: 'Google로 계속하기',
                 ),
+
+                const SizedBox(height: 12),
+
+                // e-mail Login Button
+                _SocialLoginButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder:  (_) => const EmailLoginScreen()),
+                    );
+                  },
+                  backgroundColor: Colors.purpleAccent,
+                  textColor: Colors.white,
+                  borderColor: Colors.grey[300],
+                  icon: const Icon(Icons.mail_outline_rounded, size: 24),
+                  label: '이메일로 계속하기',
+                ),
+
               ],
             ),
           ),
