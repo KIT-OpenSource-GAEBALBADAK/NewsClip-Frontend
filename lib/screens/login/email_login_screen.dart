@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_dimensions.dart';
-import '../../providers/app_provider.dart';
-import 'package:provider/provider.dart';
 import '../../core/utils/validators.dart';
 import '../../services/auth_service.dart';
+import '../home_screen.dart';
 import 'forgot_password_screen.dart';
-import 'register_screen.dart';
 
 
 class EmailLoginScreen extends StatefulWidget {
@@ -54,12 +52,16 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
     final password = _pwCtrl.text;
 
     try {
+      // ✅ AuthService를 통해 로그인 (토큰 자동 저장)
       final bool success = await login_check(email, password);
       if (!mounted) return;
 
       if (success) {
-        await context.read<AppProvider>().setLoggedInFromEmail(email);
-        Navigator.of(context).pop();
+        // ✅ 로그인 성공 시 홈 화면으로 이동 (모든 이전 화면 제거)
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+          (route) => false,
+        );
       }
     } on Exception catch (e) {
       if (!mounted) return;
@@ -126,7 +128,7 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                   onPressed: _loading ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _buttonColor,
-                    disabledBackgroundColor: _buttonColor.withOpacity(0.5),
+                    disabledBackgroundColor: _buttonColor.withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
                     ),
@@ -155,21 +157,6 @@ class _EmailLoginScreenState extends State<EmailLoginScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  const Text('|', style: TextStyle(color: Colors.grey)),
-                  const SizedBox(width: 8),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (context) => const RegisterScreen(),
-                        ),
-                      );
-                    },
-                    child: Text(
-                      '회원가입',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  ),
                 ],
               ),
             ],
