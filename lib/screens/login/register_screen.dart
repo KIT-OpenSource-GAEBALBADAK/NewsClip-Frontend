@@ -3,6 +3,7 @@ import '../../core/constants/app_dimensions.dart';
 import '../../core/utils/validators.dart';
 import '../../services/user_service.dart';
 import '../../services/auth_service.dart';
+import 'profile_setup_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -13,14 +14,17 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController(); // ✅ 이름 필드
   final _usernameCtrl = TextEditingController(); // ✅ 아이디 필드
   final _pwCtrl = TextEditingController();
   final _pwConfirmCtrl = TextEditingController();
-  final _nicknameCtrl = TextEditingController();
   bool _loading = false;
   bool _obscure = true;
   bool _obscureConfirm = true;
+
+  // ✅ 이메일 중복확인 관련 상태
+  bool _isCheckingEmail = false; // 중복확인 로딩 중
+  bool? _isEmailAvailable; // null: 미확인, true: 사용가능, false: 사용불가
+  String? _checkedEmail; // 중복확인한 이메일
 
   // ✅ 서비스 인스턴스 추가
   late final UserService _userService;
@@ -40,11 +44,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _usernameCtrl.dispose();
     _pwCtrl.dispose();
     _pwConfirmCtrl.dispose();
-    _nicknameCtrl.dispose();
     super.dispose();
   }
 
@@ -81,26 +83,94 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    setState(() => _loading = true);
+  // ✅ 이메일 중복확인
+  Future<void> _checkEmailDuplicate() async {
+    final email = _usernameCtrl.text.trim();
 
-    final name = _nameCtrl.text.trim();
-    final username = _usernameCtrl.text.trim();
-    final password = _pwCtrl.text;
-    final nickname = _nicknameCtrl.text.trim();
+    // ✅ 1단계: 이메일 형식 검증
+    final emailError = validateEmail(email);
+    if (emailError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(emailError),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    // ✅ 2단계: 형식이 올바르면 중복확인 진행
+    setState(() => _isCheckingEmail = true);
 
     try {
-      // ✅ 회원가입 API 호출
+      final isAvailable = await _userService.checkUsername(username: email);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isEmailAvailable = isAvailable;
+        _checkedEmail = email;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAvailable ? '사용 가능한 이메일입니다.' : '이미 사용 중인 이메일입니다.',
+          ),
+          backgroundColor: isAvailable ? Colors.green : Colors.red,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isEmailAvailable = null;
+        _checkedEmail = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('중복확인 실패: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isCheckingEmail = false);
+    }
+  }
+
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    // ✅ 이메일 중복확인 검증
+    final currentEmail = _usernameCtrl.text.trim();
+    if (_checkedEmail != currentEmail || _isEmailAvailable != true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('이메일 중복확인을 해주세요'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final username = _usernameCtrl.text.trim();
+      final password = _pwCtrl.text;
+
+      // ✅ 1단계: 회원가입 API 호출
       final result = await _userService.register(
-        name: name,
         username: username,
         password: password,
-        nickname: nickname,
       );
 
       if (!mounted) return;
 
+      // ✅ 회원가입 성공 메시지 표시
       final message = result['message'] ?? '회원가입이 완료되었습니다.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -110,7 +180,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
 
-      Navigator.of(context).pop();
+      // ✅ 2단계: 자동 로그인하여 토큰 획득
+      try {
+        await _authService.login(username, password);
+
+        if (!mounted) return;
+
+        // ✅ 3단계: 프로필 설정 페이지로 이동
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const ProfileSetupScreen(),
+          ),
+        );
+      } catch (loginError) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('회원가입은 완료되었으나 로그인 실패: $loginError'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        // 로그인 실패 시 로그인 화면으로 돌아가기
+        Navigator.of(context).pop();
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -139,29 +232,67 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const SizedBox(height: 20),
-              // ✅ 이름 필드 추가
-              TextFormField(
-                controller: _nameCtrl,
-                decoration: _inputDecoration('이름'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '이름을 입력하세요';
-                  }
-                  return null;
-                },
-              ),
               const SizedBox(height: 12),
-              // ✅ 아이디 필드 (이메일 → 아이디로 변경)
-              TextFormField(
-                controller: _usernameCtrl,
-                decoration: _inputDecoration('이메일'),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return '이메일을 입력하세요';
-                  }
-                  return null;
-                },
+              // ✅ 이메일 필드 + 중복확인 버튼
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _usernameCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: _inputDecoration('이메일').copyWith(
+                        suffixIcon: _isEmailAvailable != null
+                            ? Icon(
+                                _isEmailAvailable! ? Icons.check_circle : Icons.cancel,
+                                color: _isEmailAvailable! ? Colors.green : Colors.red,
+                              )
+                            : null,
+                      ),
+                      validator: validateEmail,
+                      onChanged: (value) {
+                        // 이메일이 변경되면 중복확인 상태 초기화
+                        if (_checkedEmail != null && value.trim() != _checkedEmail) {
+                          setState(() {
+                            _isEmailAvailable = null;
+                            _checkedEmail = null;
+                          });
+                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: _isCheckingEmail ? null : _checkEmailDuplicate,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _buttonColor,
+                        disabledBackgroundColor: _buttonColor.withValues(alpha: 0.5),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      child: _isCheckingEmail
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
+                          : const Text(
+                              '중복확인',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               TextFormField(
@@ -196,12 +327,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 },
                 autovalidateMode: AutovalidateMode.onUserInteraction,
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _nicknameCtrl,
-                decoration: _inputDecoration('닉네임'),
-                validator: validateNickname,
-              ),
               const SizedBox(height: 32),
               SizedBox(
                 height: 48,
@@ -209,7 +334,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: _loading ? null : _submit,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: _buttonColor,
-                    disabledBackgroundColor: _buttonColor.withOpacity(0.5),
+                    disabledBackgroundColor: _buttonColor.withValues(alpha: 0.5),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(AppDimensions.radiusLarge),
                     ),

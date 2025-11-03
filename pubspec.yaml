@@ -11,7 +11,10 @@ dependencies:
     sdk: flutter
   # 상태 관리
   provider: ^6.1.1
-  
+
+  #이미지 선택 패키지
+  image_picker: ^1.0.4
+
   # 로컬 저장소
   shared_preferences: ^2.2.2
   
@@ -27,7 +30,9 @@ dependencies:
   shimmer: ^3.0.0
   
   # 소셜 로그인
-  kakao_flutter_sdk: ^1.9.0
+  kakao_flutter_sdk_user: ^1.9.5
+  kakao_flutter_sdk_common: ^1.9.1+1 # getKeyHash(), init() 등 공통 기능용
+  webview_flutter: ^4.4.2
   google_sign_in: ^6.2.1
   sign_in_with_apple: ^6.1.0
   
