@@ -48,16 +48,22 @@ lib/
 ├── screens/                        # UI (기능별 화면)
 │   ├── home_screen.dart
 │   ├── login/
+│       ├── email_login_screen.dart
+│       ├── forgot_password_screen.dart
+│       ├── login_screen.dart
+│       └── register_screen.dart
 │   ├── news/
 │   ├── community/
 │   ├── bookmarks/
 │   ├── notifications/
 │   └── profile/
+│       └── profile_screen.dart
 │
 ├── services/                       # API 통신 (Dio 기반)
-│   ├── api_client.dart
 │   ├── auth_service.dart
-│   ├── news_service.dart
+│   ├── user_service.dart
+│   ├── google_auth_service.dart
+│   ├── kakao_auth_service.dart
 │   ├── community_service.dart
 │   ├── profile_service.dart
 │   └── notification_service.dart
