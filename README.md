@@ -48,10 +48,10 @@ lib/
 ├── screens/                        # UI (기능별 화면)
 │   ├── home_screen.dart
 │   ├── login/
-│       ├── email_login_screen.dart
-│       ├── forgot_password_screen.dart
-│       ├── login_screen.dart
-│       └── register_screen.dart
+│   │   ├── email_login_screen.dart
+│   │   ├── forgot_password_screen.dart
+│   │   ├── login_screen.dart
+│   │   └── register_screen.dart
 │   ├── news/
 │   ├── community/
 │   ├── bookmarks/
