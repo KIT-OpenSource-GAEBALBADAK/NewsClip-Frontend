@@ -1,12 +1,16 @@
 // 회원가입, 회원정보 수정, 탈퇴 기능 관리
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'dio_service.dart';
 
 // 회원가입, 회원정보 수정, 탈퇴 기능 관리
 class UserService {
-  final Dio _dio;
+  late final Dio _dio;
 
-  UserService(this._dio); // ✅ 생성자 : AuthService의 Dio 인스턴스를 주입받음
+  UserService() {
+    // DioService의 싱글톤 인스턴스 사용
+    _dio = DioService().dio;
+  }
 
   /// 회원가입
   /// POST https://newsclip.duckdns.org/v1/auth/register

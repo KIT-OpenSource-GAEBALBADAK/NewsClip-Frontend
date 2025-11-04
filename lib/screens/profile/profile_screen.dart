@@ -13,7 +13,6 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  late final AuthService _authService;
   late final ProfileService _profileService;
 
   String _nickname = '사용자';
@@ -24,8 +23,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _authService = AuthService();
-    _profileService = ProfileService(_authService.dio);
+    // ✅ 서비스 초기화 - DioService를 중앙에서 관리하므로 직접 생성
+    _profileService = ProfileService();
     _loadProfile();
   }
 

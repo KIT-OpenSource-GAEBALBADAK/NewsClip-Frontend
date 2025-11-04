@@ -37,7 +37,7 @@ class NewsClipApp extends StatelessWidget {
                   ),
                 );
               }
-
+              
               // 토큰이 있으면 홈 화면, 없으면 로그인 화면
               final isLoggedIn = snapshot.data ?? false;
               return isLoggedIn ? const HomeScreen() : const LoginScreen();

@@ -4,6 +4,7 @@ import 'package:newsclip/screens/login/register_screen.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_dimensions.dart';
 import '../../services/kakao_auth_service.dart';
+import '../../services/google_auth_service.dart';
 import 'email_login_screen.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -43,15 +44,10 @@ class LoginScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
                     _SocialLoginButton(
-                      onPressed: () {
-                        // TODO: Google 로그인 구현 필요
-                        // GoogleAuthService를 통해 로그인 후 AuthService에 토큰 저장
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Google 로그인은 아직 구현되지 않았습니다.'),
-                            backgroundColor: Colors.orange,
-                          ),
-                        );
+                      onPressed: () async {
+                        final googleService = GoogleAuthService();
+                        await googleService.signInWithGoogle(context);
+                        // signInWithGoogle 내부에서 성공/실패 처리 및 화면 이동 처리됨
                       },
                       backgroundColor: Colors.white,
                       textColor: Colors.black,

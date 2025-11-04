@@ -27,15 +27,6 @@ void main() async {
     DeviceOrientation.portraitDown,
   ]);
 
-  try {
-    String keyHash = await KakaoSdk.origin;
-    print('=============================================');
-    print('🔑 KAKAO KEY HASH: $keyHash');
-    print('=============================================');
-  } catch (e) {
-    print('Key hash retrieval failed: $e');
-  }
-
   KakaoSdk.init(
     nativeAppKey: '25c7ef75b2b00474bc1603a180884255', // TODO: 카카오 네이티브 앱 키로 교체
   );

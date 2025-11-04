@@ -33,13 +33,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final Color _fieldBorderColor = Colors.white;
   final Color _buttonColor = Colors.purpleAccent;
 
-  // 앞으로 백엔드와 통신시 AuthService의 Dio 인스턴스를 재사용!!!!!!!!!
   @override
   void initState() {
     super.initState();
-    // ✅ 서비스 초기화
-    _authService = AuthService(); // ✅ 싱글톤 인스턴스
-    _userService = UserService(_authService.dio); // ✅ 동일한 Dio
+    // ✅ 서비스 초기화 - DioService를 중앙에서 관리하므로 직접 생성
+    _userService = UserService();
+    _authService = AuthService();
   }
 
   @override

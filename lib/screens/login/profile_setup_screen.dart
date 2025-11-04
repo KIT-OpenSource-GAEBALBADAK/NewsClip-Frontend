@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../core/constants/app_dimensions.dart';
 import '../../services/user_service.dart';
-import '../../services/auth_service.dart';
 import '../home_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
@@ -20,14 +19,13 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   bool _loading = false;
 
   late final UserService _userService;
-  late final AuthService _authService;
   final Color _buttonColor = Colors.purpleAccent;
 
   @override
   void initState() {
     super.initState();
-    _authService = AuthService();
-    _userService = UserService(_authService.dio);
+    // ✅ 서비스 초기화 - DioService를 중앙에서 관리하므로 직접 생성
+    _userService = UserService();
   }
 
   @override
