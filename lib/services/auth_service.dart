@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dio_service.dart';
 
 /// 로그인, 로그아웃, 토큰 관리를 담당하는 서비스
 class AuthService {
@@ -13,29 +14,8 @@ class AuthService {
 
   /// Private 생성자
   AuthService._internal() {
-    _dio = Dio(BaseOptions(
-      baseUrl: 'https://newsclip.duckdns.org/v1',
-      headers: {'Content-Type': 'application/json'},
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
-    ));
-
-    // 인터셉터: 모든 요청에 자동으로 토큰 추가
-    _dio.interceptors.add(InterceptorsWrapper(
-      onRequest: (options, handler) async {
-        final token = await getAccessToken();
-        if (token != null && token.isNotEmpty) {
-          options.headers['Authorization'] = 'Bearer $token';
-          print('🔑 토큰 추가: Bearer ${token.substring(0, 20)}...');
-        }
-        return handler.next(options);
-      },
-      onError: (error, handler) async {
-        print('❌ API 에러 발생: ${error.response?.statusCode}');
-        print('❌ 에러 데이터: ${error.response?.data}');
-        return handler.next(error);
-      },
-    ));
+    // DioService의 싱글톤 인스턴스 사용
+    _dio = DioService().dio;
   }
 
   /// Dio 인스턴스 getter

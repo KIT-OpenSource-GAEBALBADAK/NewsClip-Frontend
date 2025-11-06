@@ -1,11 +1,15 @@
 // 프로필 조회, 수정 기능 관리
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'dio_service.dart';
 
 class ProfileService {
-  final Dio _dio;
+  late final Dio _dio;
 
-  ProfileService(this._dio);
+  ProfileService() {
+    // DioService의 싱글톤 인스턴스 사용
+    _dio = DioService().dio;
+  }
 
   /// 내 프로필 조회
   /// GET https://newsclip.duckdns.org/v1/me
