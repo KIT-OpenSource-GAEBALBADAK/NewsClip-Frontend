@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../login/login_screen.dart';
+import 'profile_setup_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -36,8 +37,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
 
       final data = response['data'];
+      final nickname = data['nickname'];
+
+      // ✅ nickname이 null이면 프로필 설정 화면으로 이동
+      if (nickname == null || nickname.toString().trim().isEmpty) {
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+        );
+
+        // ✅ 프로필 설정 화면에서 돌아왔을 때 프로필 정보 다시 로드
+        if (result == true || result == null) {
+          await _loadProfile();
+        }
+        return;
+      }
+
       setState(() {
-        _nickname = data['nickname'] ?? '사용자';
+        _nickname = nickname;
         _role = data['role'] ?? 'user';
         _profileImage = data['profile_image'];
         _isLoading = false;
