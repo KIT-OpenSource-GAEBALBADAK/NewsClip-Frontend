@@ -12,7 +12,7 @@ class GoogleAuthService {
     ],
     // ⚠️ Web 클라이언트 ID를 입력하세요 (Google Cloud Console에서 확인)
     // TODO: Google Cloud Console → API 및 서비스 → 사용자 인증 정보 → "웹 애플리케이션" 클라이언트 ID
-    serverClientId: '1092221636203-4tfhiv0mod5vo0a5mnc8t95a1udf0ggh.apps.googleusercontent.com',
+    serverClientId: '577550543507-s99mf2l1jkfo0ov065r7858kt4veu5jp.apps.googleusercontent.com',
   );
 
   /// 구글 소셜 로그인

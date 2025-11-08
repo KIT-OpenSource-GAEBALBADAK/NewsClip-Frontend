@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_dimensions.dart';
 import '../../core/utils/validators.dart';
 import '../../services/user_service.dart';
-import '../../services/auth_service.dart';
-import 'profile_setup_screen.dart';
+import 'email_login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -28,7 +27,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   // ✅ 서비스 인스턴스 추가
   late final UserService _userService;
-  late final AuthService _authService;
 
   final Color _fieldBorderColor = Colors.white;
   final Color _buttonColor = Colors.purpleAccent;
@@ -38,7 +36,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.initState();
     // ✅ 서비스 초기화 - DioService를 중앙에서 관리하므로 직접 생성
     _userService = UserService();
-    _authService = AuthService();
   }
 
   @override
@@ -170,7 +167,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
 
       // ✅ 회원가입 성공 메시지 표시
-      final message = result['message'] ?? '회원가입이 완료되었습니다.';
+      final message = result['message'] ?? '회원가입이 완료되었습니다. 로그인해주세요.';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(message),
@@ -179,30 +176,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ),
       );
 
-      // ✅ 2단계: 자동 로그인하여 토큰 획득
-      try {
-        await _authService.login(username, password);
-
-        if (!mounted) return;
-
-        // ✅ 3단계: 프로필 설정 페이지로 이동
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => const ProfileSetupScreen(),
-          ),
-        );
-      } catch (loginError) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('회원가입은 완료되었으나 로그인 실패: $loginError'),
-            backgroundColor: Colors.orange,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-        // 로그인 실패 시 로그인 화면으로 돌아가기
-        Navigator.of(context).pop();
-      }
+      // ✅ 이메일 로그인 화면으로 이동
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const EmailLoginScreen()),
+      );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
