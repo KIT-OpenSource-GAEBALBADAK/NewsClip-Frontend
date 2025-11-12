@@ -1,5 +1,5 @@
 class NewsItem {
-  final String id;
+  final int id;
   final String title;
   final String summary;
   final String image;
@@ -11,6 +11,10 @@ class NewsItem {
   final int comments;
   final String source;
   final String content;
+  final String url;
+  final bool isBookmarked;
+  final bool isLiked;
+  final bool isDisliked;
 
   NewsItem({
     required this.id,
@@ -25,41 +29,52 @@ class NewsItem {
     required this.comments,
     required this.source,
     required this.content,
+    required this.url,
+    required this.isBookmarked,
+    required this.isLiked,
+    required this.isDisliked,
   });
 
   // JSON to NewsItem 변환 (Factory Constructor)
   factory NewsItem.fromJson(Map<String, dynamic> json) {
     return NewsItem(
-      id: json['newsId'] ?? '',
+      id: json['id'] ?? 0,
       title: json['title'] ?? '',
       summary: json['content'] ?? '',
       image: json['image_url'] ?? '',
       category: json['category'] ?? '',
-      publishedAt: DateTime.tryParse(json['publishedAt'] ?? '') ?? DateTime.now(),
-      readTime: '${json['readTimeMinutes'] ?? 3}분',
-      views: json['viewCount'] ?? 0,
-      likes: json['likeCount'] ?? 0,
-      comments: json['commentCount'] ?? 0,
+      publishedAt: DateTime.tryParse(json['published_at'] ?? '') ?? DateTime.now(),
+      readTime: '${json['read_time_minutes'] ?? 3}분',
+      views: json['view_count'] ?? 0,
+      likes: json['like_count'] ?? 0,
+      comments: json['comment_count'] ?? 0,
       source: json['source'] ?? '',
       content: json['content'] ?? '',
+      url: json['url'] ?? '',
+      isBookmarked: json['isBookmarked'] ?? false,
+      isLiked: json['isLiked'] ?? false,
+      isDisliked: json['isDisliked'] ?? false,
     );
   }
 
   // NewsItem to JSON 변환
   Map<String, dynamic> toJson() {
     return {
-      'newsId': id,
+      'id': id,
       'title': title,
       'content': summary,
-      'imageUrl': image,
+      'image_url': image,
       'category': category,
-      'publishedAt': publishedAt.toIso8601String(),
-      'readTimeMinutes': int.tryParse(readTime.replaceAll('분', '')) ?? 3,
-      'viewCount': views,
-      'likeCount': likes,
-      'commentCount': comments,
+      'published_at': publishedAt.toIso8601String(),
+      'read_time_minutes': int.tryParse(readTime.replaceAll('분', '')) ?? 3,
+      'view_count': views,
+      'like_count': likes,
+      'comment_count': comments,
       'source': source,
+      'url': url,
+      'isBookmarked': isBookmarked,
+      'isLiked': isLiked,
+      'isDisliked': isDisliked,
     };
   }
 }
-

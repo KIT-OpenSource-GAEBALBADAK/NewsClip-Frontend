@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/news_item.dart';
 import '../../services/news_list_service.dart';
+import 'news_reader_screen.dart'; // 화면 이동을 위해 추가
 
 class NewsListScreen extends StatefulWidget {
   const NewsListScreen({Key? key}) : super(key: key);
@@ -15,10 +16,9 @@ class _NewsListScreenState extends State<NewsListScreen> {
   final _scrollCtrl = ScrollController();
   final _newsService = NewsListService();
 
-  // State
   List<NewsItem> _allNews = [];
   List<NewsItem> _filtered = [];
-  final Set<String> _liked = {};
+  // final Set<int> _liked = {}; // 로컬 상태 관리 제거
   final List<String> _categories = [
     "전체",
     "정치",
@@ -83,8 +83,8 @@ class _NewsListScreenState extends State<NewsListScreen> {
       );
 
       final List<dynamic> newsData = response['data']['news'];
-      final newsItems =
-          newsData.map((json) => NewsItem.fromJson(json)).toList();
+      
+      final newsItems = newsData.map((json) => NewsItem.fromJson(json)).toList();
 
       setState(() {
         _canLoadMore = newsItems.isNotEmpty;
@@ -163,17 +163,50 @@ class _NewsListScreenState extends State<NewsListScreen> {
                             );
                           }
 
+                          final item = _filtered[i];
                           return NewsCard(
-                            item: _filtered[i],
-                            liked: _liked.contains(_filtered[i].id),
-                            onToggleLike: () => setState(() {
-                              final id = _filtered[i].id;
-                              _liked.contains(id)
-                                  ? _liked.remove(id)
-                                  : _liked.add(id);
-                            }),
+                            item: item,
+                            // API가 제공하는 isLiked 값을 직접 사용합니다.
+                            liked: item.isLiked,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => NewsReaderScreen(newsId: item.id),
+                                ),
+                              );
+                            },
+                            onToggleLike: () {
+                              // TODO: 추후 좋아요 API 연동 필요
+                              // 임시로 UI상에서만 상태를 변경합니다. (데이터는 유지되지 않음)
+                              setState(() {
+                                final newsIndex = _allNews.indexWhere((n) => n.id == item.id);
+                                if (newsIndex != -1) {
+                                  final oldNews = _allNews[newsIndex];
+                                  _allNews[newsIndex] = NewsItem(
+                                    id: oldNews.id,
+                                    title: oldNews.title,
+                                    summary: oldNews.summary,
+                                    image: oldNews.image,
+                                    category: oldNews.category,
+                                    publishedAt: oldNews.publishedAt,
+                                    readTime: oldNews.readTime,
+                                    views: oldNews.views,
+                                    likes: oldNews.isLiked ? oldNews.likes - 1 : oldNews.likes + 1,
+                                    comments: oldNews.comments,
+                                    source: oldNews.source,
+                                    content: oldNews.content,
+                                    url: oldNews.url,
+                                    isBookmarked: oldNews.isBookmarked,
+                                    isLiked: !oldNews.isLiked, // isLiked 상태를 반전
+                                    isDisliked: oldNews.isDisliked,
+                                  );
+                                  _applyFilter();
+                                }
+                              });
+                            },
                             onShare: () async {
-                              final n = _filtered[i];
+                              final n = item;
                               final text = '${n.title}\n${n.summary}';
                               await Clipboard.setData(
                                   ClipboardData(text: text));
@@ -192,6 +225,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
   }
 }
 
+// ... (_Header, _SearchBar, _CategoryRow 위젯은 여기에 그대로 유지됩니다)
 class _Header extends StatelessWidget {
   const _Header();
 
@@ -321,124 +355,101 @@ class _CategoryRow extends StatelessWidget {
       );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// News card
-// ──────────────────────────────────────────────────────────────────────────────
+
 class NewsCard extends StatelessWidget {
-  const NewsCard(
-      {super.key,
-      required this.item,
-      required this.liked,
-      required this.onToggleLike,
-      required this.onShare});
+  const NewsCard({
+    super.key,
+    required this.item,
+    required this.liked,
+    required this.onTap, // onTap 콜백 추가
+    required this.onToggleLike,
+    required this.onShare,
+  });
 
   final NewsItem item;
   final bool liked;
+  final VoidCallback onTap; // onTap 콜백 추가
   final VoidCallback onToggleLike;
   final Future<void> Function() onShare;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withAlpha(230),
-            borderRadius: BorderRadius.circular(14),
-            border:
-                Border.all(color: Theme.of(context).dividerColor.withAlpha(51)),
-            boxShadow: [
-              BoxShadow(
-                  color: Colors.black.withAlpha(8),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2)),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child:
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: Image.network(
-                    item.image,
-                    width: 84,
-                    height: 84,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) =>
-                        const SizedBox(
+  Widget build(BuildContext context) => GestureDetector( // GestureDetector로 감싸기
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface.withAlpha(230),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Theme.of(context).dividerColor.withAlpha(51)),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.network(
+                      item.image,
                       width: 84,
                       height: 84,
-                      child:
-                          Icon(Icons.broken_image_outlined, color: Colors.grey),
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const SizedBox(
+                        width: 84,
+                        height: 84,
+                        child: Icon(Icons.broken_image_outlined, color: Colors.grey),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(children: [
-                          BadgeChip(item.category),
-                          const SizedBox(width: 6),
-                          Flexible(
-                              child: Text(item.source,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(color: Colors.grey))),
-                          const SizedBox(width: 6),
-                          Text('•', style: TextStyle(color: Colors.grey[600])),
-                          const SizedBox(width: 6),
-                          Text(
-                              item.publishedAt
-                                  .toIso8601String()
-                                  .substring(0, 10),
-                              style: const TextStyle(color: Colors.grey)),
-                        ]),
-                        const SizedBox(height: 6),
-                        Text(item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style:
-                                const TextStyle(fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 6),
-                        Text(item.summary,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(color: Colors.grey)),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Row(children: [
+                        BadgeChip(item.category),
+                        const SizedBox(width: 6),
+                        Flexible(child: Text(item.source, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey))),
+                        const SizedBox(width: 6),
+                        Text('•', style: TextStyle(color: Colors.grey[600])),
+                        const SizedBox(width: 6),
+                        Text(
+                          item.publishedAt.toIso8601String().substring(0, 10),
+                          style: const TextStyle(color: Colors.grey)
+                        ),
                       ]),
-                ),
+                      const SizedBox(height: 6),
+                      Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+                      Text(item.summary, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey)),
+                    ]),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                Row(children: [
+                  const Icon(Icons.remove_red_eye_outlined, size: 14),
+                  const SizedBox(width: 4),
+                  Text('${item.views}'),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.schedule, size: 14),
+                  const SizedBox(width: 4),
+                  Text(item.readTime),
+                ]),
+                Row(children: [
+                  IconButton(onPressed: onToggleLike, icon: Icon(liked ? Icons.favorite : Icons.favorite_border), color: liked ? Colors.red : Colors.black54),
+                  Text('${item.likes}'),
+                  const Spacer(),
+                  IconButton(onPressed: onShare, icon: const Icon(Icons.ios_share_rounded)),
+                ])
               ]),
-              const SizedBox(height: 8),
-              Row(children: [
-                const Icon(Icons.remove_red_eye_outlined, size: 14),
-                const SizedBox(width: 4),
-                Text('${item.views}'),
-                const SizedBox(width: 12),
-                const Icon(Icons.schedule, size: 14),
-                const SizedBox(width: 4),
-                Text(item.readTime),
-              ]),
-              Row(children: [
-                IconButton(
-                    onPressed: onToggleLike,
-                    icon: Icon(liked ? Icons.favorite : Icons.favorite_border),
-                    color: liked ? Colors.red : Colors.black54),
-                Text('${item.likes}'),
-                const Spacer(),
-                IconButton(
-                    onPressed: onShare,
-                    icon: const Icon(Icons.ios_share_rounded)),
-              ])
-            ]),
+            ),
           ),
         ),
       );
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Small bits
-// ──────────────────────────────────────────────────────────────────────────────
+// ... (BadgeChip 위젯은 여기에 그대로 유지됩니다)
 class BadgeChip extends StatelessWidget {
   const BadgeChip(this.text, {super.key});
 
