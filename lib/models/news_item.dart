@@ -33,7 +33,7 @@ class NewsItem {
       id: json['newsId'] ?? '',
       title: json['title'] ?? '',
       summary: json['content'] ?? '',
-      image: json['imageUrl'] ?? '',
+      image: json['image_url'] ?? '',
       category: json['category'] ?? '',
       publishedAt: DateTime.tryParse(json['publishedAt'] ?? '') ?? DateTime.now(),
       readTime: '${json['readTimeMinutes'] ?? 3}분',

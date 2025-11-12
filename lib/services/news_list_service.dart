@@ -41,7 +41,7 @@ class NewsListService {
         },
       );
 
-      print('✅ 실제 API에서 뉴스 목록 조회 성공');
+      print('✅ 뉴스 목록 조회 성공');
 
       // 실제 API는 이미 data 필드를 포함한 Map을 반환합니다.
       return response.data as Map<String, dynamic>;
