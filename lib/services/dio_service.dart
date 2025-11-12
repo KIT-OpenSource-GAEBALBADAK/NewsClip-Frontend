@@ -22,8 +22,9 @@ class DioService {
     _dio = Dio(BaseOptions(
       baseUrl: 'https://newsclip.duckdns.org/v1',
       headers: {'Content-Type': 'application/json'},
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 10),
+      // 타임아웃 시간을 30초로 늘립니다.
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(seconds: 30),
     ));
 
     // 인터셉터: 모든 요청에 자동으로 토큰 추가 및 401 에러 시 토큰 재발급

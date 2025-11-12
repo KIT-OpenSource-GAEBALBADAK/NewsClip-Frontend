@@ -15,43 +15,27 @@ class ProfileService {
   /// GET https://newsclip.duckdns.org/v1/me
   Future<Map<String, dynamic>> getMyProfile() async {
     try {
+      // 디버깅 로그를 간단하게 수정합니다.
       debugPrint('🔵 프로필 조회 요청 시작');
-      debugPrint('🔵 요청 URL: ${_dio.options.baseUrl}/me');
 
-      final response = await _dio.get(
-        '/me',
-        options: Options(
-          validateStatus: (status) => status! < 500,
-        ),
-      );
+      // 'validateStatus' 옵션을 제거하여 Dio가 401을 에러로 처리하도록 합니다.
+      final response = await _dio.get('/me');
 
-      debugPrint('✅ 응답 상태 코드: ${response.statusCode}');
-      debugPrint('✅ 응답 데이터: ${response.data}');
+      debugPrint('✅ 프로필 조회 성공');
+      // 인터셉터에서 재시도 후 성공하면 여기에 도달합니다.
+      return response.data as Map<String, dynamic>;
 
-      if (response.statusCode == 200 && response.data['status'] == 'success') {
-        return response.data as Map<String, dynamic>;
-      }
-
-      throw '프로필 조회에 실패했습니다. (코드: ${response.statusCode})';
     } on DioException catch (e) {
-      debugPrint('❌ DioException 발생');
-      debugPrint('❌ 타입: ${e.type}');
-      debugPrint('❌ 응답 코드: ${e.response?.statusCode}');
-      debugPrint('❌ 응답 데이터: ${e.response?.data}');
-
-      if (e.response != null) {
-        final statusCode = e.response!.statusCode;
-        final data = e.response!.data;
-
-        if (statusCode == 401) {
-          throw '로그인이 필요합니다.';
-        }
-
-        if (data is Map && data.containsKey('message')) {
-          throw data['message'];
-        }
-
-        throw '프로필 조회에 실패했습니다. (코드: $statusCode)';
+      debugPrint('❌ DioException 발생: ${e.message}');
+      
+      // 인터셉터의 재발급 실패 후에도 401이 올 수 있습니다.
+      if (e.response?.statusCode == 401) {
+        throw '인증에 실패했습니다. 다시 로그인해주세요.';
+      }
+      
+      final data = e.response?.data;
+      if (data is Map && data.containsKey('message')) {
+        throw data['message'];
       }
 
       if (e.type == DioExceptionType.connectionTimeout ||
@@ -78,15 +62,11 @@ class ProfileService {
   }) async {
     try {
       debugPrint('🔵 프로필 설정 요청 시작');
-      debugPrint('🔵 nickname: $nickname');
-      debugPrint('🔵 profileImagePath: $profileImagePath');
 
-      // FormData 구성
       final formData = FormData.fromMap({
         'nickname': nickname,
       });
 
-      // 이미지 파일이 있으면 추가
       if (profileImagePath != null && profileImagePath.isNotEmpty) {
         formData.files.add(
           MapEntry(
@@ -99,33 +79,20 @@ class ProfileService {
         );
       }
 
+      // 'validateStatus' 옵션을 제거합니다.
       final response = await _dio.post(
         '/auth/setup-profile',
         data: formData,
         options: Options(
           contentType: 'multipart/form-data',
-          validateStatus: (status) => status! < 500,
         ),
       );
 
-      debugPrint('✅ 응답 상태 코드: ${response.statusCode}');
-      debugPrint('✅ 응답 데이터: ${response.data}');
-
-      if (response.statusCode == 200 && response.data['status'] == 'success') {
-        return response.data as Map<String, dynamic>;
-      }
-
-      // 에러 응답 처리
-      if (response.data is Map && response.data.containsKey('message')) {
-        throw response.data['message'];
-      }
-
-      throw '프로필 설정에 실패했습니다. (코드: ${response.statusCode})';
+      debugPrint('✅ 프로필 설정 성공');
+      return response.data as Map<String, dynamic>;
+      
     } on DioException catch (e) {
-      debugPrint('❌ DioException 발생');
-      debugPrint('❌ 타입: ${e.type}');
-      debugPrint('❌ 응답 코드: ${e.response?.statusCode}');
-      debugPrint('❌ 응답 데이터: ${e.response?.data}');
+      debugPrint('❌ DioException 발생: ${e.message}');
 
       if (e.response != null) {
         final statusCode = e.response!.statusCode;
@@ -136,10 +103,6 @@ class ProfileService {
         }
 
         if (statusCode == 400 && data is Map && data.containsKey('message')) {
-          throw data['message'];
-        }
-
-        if (data is Map && data.containsKey('message')) {
           throw data['message'];
         }
 
@@ -162,4 +125,3 @@ class ProfileService {
     }
   }
 }
-
