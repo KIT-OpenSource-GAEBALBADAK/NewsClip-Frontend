@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 
 import 'news/news_list_screen.dart';
-import 'news/news_reader_screen.dart';
+import 'news/news_tinder_screen.dart';
 import 'community/community_screen.dart';
 import 'bookmarks/bookmarks_screen.dart';
 import 'profile/profile_screen.dart';
