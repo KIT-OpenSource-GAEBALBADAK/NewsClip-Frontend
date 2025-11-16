@@ -21,7 +21,7 @@ class DioService {
   DioService._internal() {
     _dio = Dio(BaseOptions(
       baseUrl: 'https://newsclip.duckdns.org/v1',
-      // baseUrl: 'https://fb84a214-3d73-423b-8aa8-3aa41d48923f.mock.pstmn.io',
+
       headers: {'Content-Type': 'application/json'},
       // 타임아웃 시간을 30초로 늘립니다.
       connectTimeout: const Duration(seconds: 30),
