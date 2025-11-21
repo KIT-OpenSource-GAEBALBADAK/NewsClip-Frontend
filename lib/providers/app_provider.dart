@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../models/news_article.dart';
+import '../models/news_item.dart';
 import '../models/notification.dart';
 
 /// 앱의 전역 상태를 관리하는 Provider
@@ -16,8 +16,8 @@ class AppProvider with ChangeNotifier {
   bool get isDarkMode => _isDarkMode;
 
   // Bookmarks
-  List<NewsArticle> _bookmarkedNews = [];
-  List<NewsArticle> get bookmarkedNews => _bookmarkedNews;
+  List<NewsItem> _bookmarkedNews = [];
+  List<NewsItem> get bookmarkedNews => _bookmarkedNews;
 
   // Notifications
   List<NotificationModel> _notifications = [];
@@ -44,7 +44,7 @@ class AppProvider with ChangeNotifier {
   }
 
   // ==================== Bookmarks ====================
-  Future<void> addBookmark(NewsArticle news) async {
+  Future<void> addBookmark(NewsItem news) async {
     if (_bookmarkedNews.any((b) => b.id == news.id)) return;
 
     _bookmarkedNews.add(news);
