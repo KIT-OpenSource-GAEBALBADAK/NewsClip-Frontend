@@ -57,6 +57,44 @@ class NewsItem {
     );
   }
 
+  NewsItem copyWith({
+    int? id,
+    String? title,
+    String? summary,
+    String? image,
+    String? category,
+    DateTime? publishedAt,
+    String? readTime,
+    int? views,
+    int? likes,
+    int? comments,
+    String? source,
+    String? content,
+    String? url,
+    bool? isBookmarked,
+    bool? isLiked,
+    bool? isDisliked,
+  }) {
+    return NewsItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      summary: summary ?? this.summary,
+      image: image ?? this.image,
+      category: category ?? this.category,
+      publishedAt: publishedAt ?? this.publishedAt,
+      readTime: readTime ?? this.readTime,
+      views: views ?? this.views,
+      likes: likes ?? this.likes,
+      comments: comments ?? this.comments,
+      source: source ?? this.source,
+      content: content ?? this.content,
+      url: url ?? this.url,
+      isBookmarked: isBookmarked ?? this.isBookmarked,
+      isLiked: isLiked ?? this.isLiked,
+      isDisliked: isDisliked ?? this.isDisliked,
+    );
+  }
+
   // NewsItem to JSON 변환
   Map<String, dynamic> toJson() {
     return {

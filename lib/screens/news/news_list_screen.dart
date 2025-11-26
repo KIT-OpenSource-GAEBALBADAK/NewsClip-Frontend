@@ -190,26 +190,79 @@ class _NewsListScreenState extends State<NewsListScreen> {
                           onTap: () {
                             Navigator.push(context, MaterialPageRoute(builder: (context) => NewsReaderScreen(newsId: item.id)));
                           },
-                          onToggleLike: () {
-                            setState(() {
-                              final id = item.id;
-                              if (_liked.contains(id)) { _liked.remove(id); }
-                              else { _liked.add(id); _disliked.remove(id); }
-                            });
-                          },
-                          onToggleDislike: () {
-                            setState(() {
-                              final id = item.id;
-                              final current = _dislikeCounts[id] ?? 0;
-                              if (_disliked.contains(id)) {
-                                _disliked.remove(id);
-                                _dislikeCounts[id] = (current - 1).clamp(0, 999999);
-                              } else {
-                                _disliked.add(id);
-                                _liked.remove(id);
-                                _dislikeCounts[id] = current + 1;
+                          onToggleLike: () async {
+                            try {
+                              final result = await _newsService.interactWithNews(item.id, 'like');
+                              setState(() {
+                                final index = _allNews.indexWhere((n) => n.id == item.id);
+                                if (index != -1) {
+                                  _allNews[index] = _allNews[index].copyWith(
+                                    isLiked: result['isLiked'],
+                                    isDisliked: result['isDisliked'],
+                                    likes: result['likeCount'],
+                                  );
+                                  _dislikeCounts[item.id] = result['dislikeCount'];
+
+                                  if (_allNews[index].isLiked) {
+                                    _liked.add(item.id);
+                                  } else {
+                                    _liked.remove(item.id);
+                                  }
+                                  if (_allNews[index].isDisliked) {
+                                    _disliked.add(item.id);
+                                  } else {
+                                    _disliked.remove(item.id);
+                                  }
+                                  _applyFilter();
+                                }
+                              });
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('좋아요 처리에 실패했습니다: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
                               }
-                            });
+                            }
+                          },
+                          onToggleDislike: () async {
+                            try {
+                              final result = await _newsService.interactWithNews(item.id, 'dislike');
+                              setState(() {
+                                final index = _allNews.indexWhere((n) => n.id == item.id);
+                                if (index != -1) {
+                                  _allNews[index] = _allNews[index].copyWith(
+                                    isLiked: result['isLiked'],
+                                    isDisliked: result['isDisliked'],
+                                    likes: result['likeCount'],
+                                  );
+                                  _dislikeCounts[item.id] = result['dislikeCount'];
+
+                                  if (_allNews[index].isLiked) {
+                                    _liked.add(item.id);
+                                  } else {
+                                    _liked.remove(item.id);
+                                  }
+                                  if (_allNews[index].isDisliked) {
+                                    _disliked.add(item.id);
+                                  } else {
+                                    _disliked.remove(item.id);
+                                  }
+                                  _applyFilter();
+                                }
+                              });
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('싫어요 처리에 실패했습니다: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
                           },
                           onToggleBookmark: () async {
                             try {
