@@ -1,40 +1,41 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/news_item.dart';
 import '../../services/news_list_service.dart';
-import 'news_reader_screen.dart'; // 화면 이동을 위해 추가
+import 'news_reader_screen.dart';
 
 class NewsListScreen extends StatefulWidget {
-  const NewsListScreen({Key? key}) : super(key: key);
+  const NewsListScreen({super.key});
 
   @override
   State<NewsListScreen> createState() => _NewsListScreenState();
 }
 
 class _NewsListScreenState extends State<NewsListScreen> {
-  final _searchCtrl = TextEditingController();
-  final _scrollCtrl = ScrollController();
-  final _newsService = NewsListService();
+  // 🔹 기존 로직 유지
+  final TextEditingController _searchCtrl = TextEditingController();
+  final ScrollController _scrollCtrl = ScrollController();
+  final NewsListService _newsService = NewsListService();
 
   List<NewsItem> _allNews = [];
   List<NewsItem> _filtered = [];
-  // final Set<int> _liked = {}; // 로컬 상태 관리 제거
-  final List<String> _categories = [
-    "전체",
-    "정치",
-    "경제",
-    "문화",
-    "환경",
-    "기술",
-    "스포츠",
-    "라이프스타일",
-    "건강",
-    "교육",
-    "음식",
-    "여행",
-    "패션"
+
+  // ID 기반 상태 관리
+  final Set<int> _liked = {};
+  final Set<int> _disliked = {};
+  final Set<int> _bookmarked = {};
+  final Map<int, int> _dislikeCounts = {};
+
+  final List<String> _categories = const [
+    "정치", "경제", "문화", "환경", "기술",
+    "스포츠", "라이프스타일", "건강", "교육", "음식", "여행", "패션"
   ];
-  String _activeCategory = '전체';
+  late String _activeCategory;
+
+  bool _commentsOpen = false;
+  NewsItem? _commentsTarget;
+
   bool _isLoading = false;
   bool _isLoadingMore = false;
   bool _hasError = false;
@@ -44,10 +45,11 @@ class _NewsListScreenState extends State<NewsListScreen> {
   @override
   void initState() {
     super.initState();
+    _activeCategory = _categories.first;
     _loadNews(isRefresh: true);
     _scrollCtrl.addListener(() {
       if (_scrollCtrl.position.pixels >=
-              _scrollCtrl.position.maxScrollExtent * 0.95 &&
+          _scrollCtrl.position.maxScrollExtent * 0.95 &&
           !_isLoadingMore &&
           _canLoadMore) {
         _loadNews();
@@ -83,11 +85,15 @@ class _NewsListScreenState extends State<NewsListScreen> {
       );
 
       final List<dynamic> newsData = response['data']['news'];
-      
       final newsItems = newsData.map((json) => NewsItem.fromJson(json)).toList();
 
       setState(() {
         _canLoadMore = newsItems.isNotEmpty;
+        for (var item in newsItems) {
+          if (item.isLiked) _liked.add(item.id);
+          if (item.isDisliked) _disliked.add(item.id);
+          if (item.isBookmarked) _bookmarked.add(item.id);
+        }
         if (isRefresh) {
           _allNews = newsItems;
         } else {
@@ -108,364 +114,528 @@ class _NewsListScreenState extends State<NewsListScreen> {
   }
 
   void _applyFilter() {
-    final query = _searchCtrl.text.toLowerCase();
+    final q = _searchCtrl.text.trim().toLowerCase();
     setState(() {
-      _filtered = _allNews
-          .where((news) => news.title.toLowerCase().contains(query))
-          .toList();
+      _filtered = _allNews.where((n) {
+        return q.isEmpty
+            ? true
+            : n.title.toLowerCase().contains(q) ||
+            n.summary.toLowerCase().contains(q) ||
+            n.source.toLowerCase().contains(q);
+      }).toList();
     });
   }
 
+  int _getDislikeCount(int id) => _dislikeCounts[id] ?? 0;
+
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        _Header(),
-        _SearchBar(ctrl: _searchCtrl, onChanged: (_) => _applyFilter()),
-        _CategoryRow(
-          categories: _categories,
-          active: _activeCategory,
-          onSelect: (v) {
-            setState(() => _activeCategory = v);
-            _loadNews(isRefresh: true);
-          },
-        ),
-        Expanded(
-          child: _isLoading && _allNews.isEmpty
-              ? const Center(child: CircularProgressIndicator())
-              : _hasError && _allNews.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              size: 64, color: Colors.grey),
-                          const SizedBox(height: 16),
-                          const Text('뉴스를 불러올 수 없습니다'),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                            onPressed: () => _loadNews(isRefresh: true),
-                            child: const Text('다시 시도'),
-                          ),
-                        ],
-                      ),
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () => _loadNews(isRefresh: true),
-                      child: ListView.builder(
-                        controller: _scrollCtrl,
-                        itemCount: _filtered.length + (_isLoadingMore ? 1 : 0),
-                        itemBuilder: (_, i) {
-                          if (i == _filtered.length) {
-                            return const Padding(
-                              padding: EdgeInsets.all(16.0),
-                              child: Center(child: CircularProgressIndicator()),
-                            );
-                          }
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            const _Header(),
 
-                          final item = _filtered[i];
-                          return NewsCard(
-                            item: item,
-                            // API가 제공하는 isLiked 값을 직접 사용합니다.
-                            liked: item.isLiked,
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => NewsReaderScreen(newsId: item.id),
-                                ),
-                              );
-                            },
-                            onToggleLike: () {
-                              // TODO: 추후 좋아요 API 연동 필요
-                              // 임시로 UI상에서만 상태를 변경합니다. (데이터는 유지되지 않음)
+            // 🔹 검색창 영역 (위아래 경계선 추가)
+            Column(
+              children: [
+                const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)), // 위쪽 경계선
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // 적절한 여백
+                  child: _SearchBar(ctrl: _searchCtrl, onChanged: (_) => _applyFilter()),
+                ),
+                const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)), // 아래쪽 경계선
+              ],
+            ),
+
+            _CategoryRow(
+              categories: _categories,
+              active: _activeCategory,
+              onSelect: (v) {
+                setState(() => _activeCategory = v);
+                _loadNews(isRefresh: true);
+              },
+            ),
+
+            Expanded(
+              child: _isLoading && _allNews.isEmpty
+                  ? const Center(child: CircularProgressIndicator())
+                  : _hasError && _allNews.isEmpty
+                  ? Center(child: ElevatedButton(onPressed: () => _loadNews(isRefresh: true), child: const Text('다시 시도')))
+                  : Stack(
+                children: [
+                  RefreshIndicator(
+                    onRefresh: () => _loadNews(isRefresh: true),
+                    child: ListView.builder(
+                      controller: _scrollCtrl,
+                      padding: const EdgeInsets.only(top: 4, bottom: 80, left: 16, right: 16),
+                      itemCount: _filtered.length + (_isLoadingMore ? 1 : 0),
+                      itemBuilder: (_, i) {
+                        if (i == _filtered.length) {
+                          return const Padding(padding: EdgeInsets.all(16.0), child: Center(child: CircularProgressIndicator()));
+                        }
+                        final item = _filtered[i];
+                        return NewsCard(
+                          item: item,
+                          liked: _liked.contains(item.id),
+                          disliked: _disliked.contains(item.id),
+                          bookmarked: _bookmarked.contains(item.id),
+                          likeCount: item.likes +
+                              (_liked.contains(item.id) && !item.isLiked ? 1 :
+                              (_liked.contains(item.id) == false && item.isLiked ? -1 : 0)),
+                          dislikeCount: _getDislikeCount(item.id),
+                          commentCount: item.comments,
+                          onTap: () {
+                            Navigator.push(context, MaterialPageRoute(builder: (context) => NewsReaderScreen(newsId: item.id)));
+                          },
+                          onToggleLike: () {
+                            setState(() {
+                              final id = item.id;
+                              if (_liked.contains(id)) { _liked.remove(id); }
+                              else { _liked.add(id); _disliked.remove(id); }
+                            });
+                          },
+                          onToggleDislike: () {
+                            setState(() {
+                              final id = item.id;
+                              final current = _dislikeCounts[id] ?? 0;
+                              if (_disliked.contains(id)) {
+                                _disliked.remove(id);
+                                _dislikeCounts[id] = (current - 1).clamp(0, 999999);
+                              } else {
+                                _disliked.add(id);
+                                _liked.remove(id);
+                                _dislikeCounts[id] = current + 1;
+                              }
+                            });
+                          },
+                          onToggleBookmark: () async {
+                            try {
+                              final isBookmarked = await _newsService.toggleBookmark(item.id);
                               setState(() {
-                                final newsIndex = _allNews.indexWhere((n) => n.id == item.id);
-                                if (newsIndex != -1) {
-                                  final oldNews = _allNews[newsIndex];
-                                  _allNews[newsIndex] = NewsItem(
-                                    id: oldNews.id,
-                                    title: oldNews.title,
-                                    summary: oldNews.summary,
-                                    image: oldNews.image,
-                                    category: oldNews.category,
-                                    publishedAt: oldNews.publishedAt,
-                                    readTime: oldNews.readTime,
-                                    views: oldNews.views,
-                                    likes: oldNews.isLiked ? oldNews.likes - 1 : oldNews.likes + 1,
-                                    comments: oldNews.comments,
-                                    source: oldNews.source,
-                                    content: oldNews.content,
-                                    url: oldNews.url,
-                                    isBookmarked: oldNews.isBookmarked,
-                                    isLiked: !oldNews.isLiked, // isLiked 상태를 반전
-                                    isDisliked: oldNews.isDisliked,
-                                  );
-                                  _applyFilter();
+                                if (isBookmarked) {
+                                  _bookmarked.add(item.id);
+                                } else {
+                                  _bookmarked.remove(item.id);
                                 }
                               });
-                            },
-                            onShare: () async {
-                              final n = item;
-                              final text = '${n.title}\n${n.summary}';
-                              await Clipboard.setData(
-                                  ClipboardData(text: text));
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('복사 완료')));
+                                  SnackBar(
+                                    content: Text(isBookmarked ? '북마크에 추가되었습니다.' : '북마크에서 제거되었습니다.'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
                               }
-                            },
-                          );
-                        },
+                            } catch (e) {
+                              if (context.mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('북마크 처리에 실패했습니다: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          onOpenComments: () {
+                            setState(() {
+                              _commentsTarget = item;
+                              _commentsOpen = true;
+                            });
+                          },
+                          onShare: () async {
+                            final text = '${item.title}\n${item.summary}';
+                            await Clipboard.setData(ClipboardData(text: text));
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('복사 완료')));
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                  if (_commentsTarget != null)
+                    Positioned(
+                      bottom: 0, left: 0, right: 0,
+                      child: CommentsModal(
+                        isOpen: _commentsOpen,
+                        onClose: () => setState(() { _commentsOpen = false; _commentsTarget = null; }),
+                        articleId: _commentsTarget!.id,
+                        articleTitle: _commentsTarget!.title,
                       ),
                     ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
 
-// ... (_Header, _SearchBar, _CategoryRow 위젯은 여기에 그대로 유지됩니다)
 class _Header extends StatelessWidget {
   const _Header();
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 45, 12, 4),
-        child: Row(
-          children: [
-            const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 16)),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('안녕하세요 👋', style: TextStyle(fontWeight: FontWeight.w700)),
-                SizedBox(height: 2),
-                Text('오늘의 뉴스를 확인해보세요',
-                    style: TextStyle(fontSize: 11, color: Colors.grey)),
-              ],
-            ),
-            const Spacer(),
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                IconButton(
-                    onPressed: () {},
-                    icon:
-                        const Icon(Icons.notifications_none_rounded, size: 20)),
-                Positioned(
-                  right: 5,
-                  top: 5,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                        color: Colors.redAccent, shape: BoxShape.circle),
-                    child: const Text('3',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold)),
-                  ),
-                )
-              ],
-            )
-          ],
-        ),
-      );
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 20,
+            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=11'),
+            backgroundColor: Colors.grey,
+          ),
+          const SizedBox(width: 12),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text('안녕하세요 👋', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              SizedBox(height: 2),
+              Text('오늘의 뉴스를 확인해보세요', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ],
+          ),
+          const Spacer(),
+          Stack(
+            children: [
+              const Icon(Icons.notifications_outlined, size: 28, color: Colors.black54),
+              Positioned(
+                right: 2, top: 2,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                  child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 8),
+          const Icon(Icons.more_horiz, size: 28, color: Colors.black54),
+        ],
+      ),
+    );
+  }
 }
 
 class _SearchBar extends StatelessWidget {
   const _SearchBar({required this.ctrl, required this.onChanged});
-
   final TextEditingController ctrl;
   final ValueChanged<String> onChanged;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        child: SizedBox(
-          height: 38,
-          child: TextField(
-            controller: ctrl,
-            onChanged: onChanged,
-            decoration: InputDecoration(
-              hintText: '뉴스 검색...',
-              prefixIcon: const Icon(Icons.search, size: 18),
-              filled: true,
-              fillColor: Colors.grey.withAlpha(38),
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none),
-            ),
-          ),
+  Widget build(BuildContext context) {
+    return Container(
+      height: 44, // 높이 조정
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F8FA), // 아주 연한 회색 배경
+        borderRadius: BorderRadius.circular(8), // 둥글기 조정
+      ),
+      child: TextField(
+        controller: ctrl,
+        onChanged: onChanged,
+        style: const TextStyle(fontSize: 15),
+        decoration: const InputDecoration(
+          hintText: '뉴스 검색...',
+          hintStyle: TextStyle(color: Color(0xFF999999), fontSize: 15),
+          prefixIcon: Icon(Icons.search, color: Color(0xFF999999), size: 22),
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(vertical: 10), // 내부 여백 조정
         ),
-      );
+      ),
+    );
+  }
 }
 
 class _CategoryRow extends StatelessWidget {
-  const _CategoryRow(
-      {required this.categories, required this.active, required this.onSelect});
-
+  const _CategoryRow({required this.categories, required this.active, required this.onSelect});
   final List<String> categories;
   final String active;
   final ValueChanged<String> onSelect;
 
   @override
-  Widget build(BuildContext context) => Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Row(
-              children: [
-                const Text('카테고리',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                const Spacer(),
-              ],
-            ),
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+          child: Text('카테고리', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        ),
+        SizedBox(
+          height: 34,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            separatorBuilder: (_, __) => const SizedBox(width: 8),
+            itemCount: categories.length,
+            itemBuilder: (_, i) {
+              final cat = categories[i];
+              final selected = cat == active;
+              return GestureDetector(
+                onTap: () => onSelect(cat),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: selected ? Colors.black : Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: selected ? Colors.transparent : Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    cat,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                      color: selected ? Colors.white : Colors.black87,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
-          SizedBox(
-            height: 34,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              separatorBuilder: (_, __) => const SizedBox(width: 6),
-              itemCount: categories.length,
-              itemBuilder: (_, i) {
-                final cat = categories[i];
-                final selected = cat == active;
-                return ChoiceChip(
-                  label: Text(cat,
-                      style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: selected ? Colors.white : Colors.black)),
-                  selected: selected,
-                  onSelected: (_) => onSelect(cat),
-                  showCheckmark: false,
-                  backgroundColor: Colors.grey.withAlpha(25),
-                  selectedColor: Theme.of(context).primaryColor,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  shape: const StadiumBorder(),
-                );
-              },
-            ),
-          )
-        ],
-      );
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
 }
-
 
 class NewsCard extends StatelessWidget {
   const NewsCard({
     super.key,
     required this.item,
     required this.liked,
-    required this.onTap, // onTap 콜백 추가
+    required this.disliked,
+    required this.bookmarked,
+    required this.likeCount,
+    required this.dislikeCount,
+    required this.commentCount,
+    required this.onTap,
     required this.onToggleLike,
+    required this.onToggleDislike,
+    required this.onToggleBookmark,
+    required this.onOpenComments,
     required this.onShare,
   });
 
   final NewsItem item;
   final bool liked;
-  final VoidCallback onTap; // onTap 콜백 추가
+  final bool disliked;
+  final bool bookmarked;
+  final int likeCount;
+  final int dislikeCount;
+  final int commentCount;
+  final VoidCallback onTap;
   final VoidCallback onToggleLike;
+  final VoidCallback onToggleDislike;
+  final VoidCallback onToggleBookmark;
+  final VoidCallback onOpenComments;
   final Future<void> Function() onShare;
 
   @override
-  Widget build(BuildContext context) => GestureDetector( // GestureDetector로 감싸기
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFEEEEEE)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+      ),
+      child: GestureDetector(
         onTap: onTap,
+        behavior: HitTestBehavior.translucent,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface.withAlpha(230),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Theme.of(context).dividerColor.withAlpha(51)),
-              boxShadow: [
-                BoxShadow(color: Colors.black.withAlpha(8), blurRadius: 8, offset: const Offset(0, 2)),
-              ],
-            ),
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.network(
-                      item.image,
-                      width: 84,
-                      height: 84,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) => const SizedBox(
-                        width: 84,
-                        height: 84,
-                        child: Icon(Icons.broken_image_outlined, color: Colors.grey),
-                      ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, height: 1.3, letterSpacing: -0.5)),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(borderRadius: BorderRadius.circular(12), child: ImageWithFallback(url: item.image, width: 90, height: 90)),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(item.summary, maxLines: 4, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF757575), fontSize: 13, height: 1.5))),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  _CategoryBadge(item.category),
+                  const SizedBox(width: 8),
+                  Text(item.source, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  _dot(),
+                  Text(_formatDate(item.publishedAt), style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  _dot(),
+                  const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                  const SizedBox(width: 2),
+                  Text(item.readTime, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  const Spacer(),
+                  const Icon(Icons.remove_red_eye_outlined, size: 14, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text('${item.views}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Divider(height: 1, color: Color(0xFFF0F0F0)),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _ActionChipButton(
+                    isActive: liked,
+                    activeColor: const Color(0xFFFFEBEE),
+                    icon: liked ? Icons.favorite : Icons.favorite_border,
+                    iconColor: liked ? Colors.red : Colors.grey,
+                    label: '$likeCount',
+                    onTap: onToggleLike,
+                  ),
+                  const SizedBox(width: 12),
+                  _ActionChipButton(
+                    isActive: disliked,
+                    activeColor: const Color(0xFFE3F2FD),
+                    icon: disliked ? Icons.favorite : Icons.favorite_border,
+                    iconColor: disliked ? Colors.blue : Colors.grey,
+                    label: '$dislikeCount',
+                    onTap: onToggleDislike,
+                    isInverted: true,
+                  ),
+                  const SizedBox(width: 12),
+                  InkWell(
+                    onTap: onOpenComments,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.chat_bubble_outline_rounded, size: 20, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Text('$commentCount', style: const TextStyle(fontSize: 13, color: Colors.grey)),
+                      ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Row(children: [
-                        BadgeChip(item.category),
-                        const SizedBox(width: 6),
-                        Flexible(child: Text(item.source, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey))),
-                        const SizedBox(width: 6),
-                        Text('•', style: TextStyle(color: Colors.grey[600])),
-                        const SizedBox(width: 6),
-                        Text(
-                          item.publishedAt.toIso8601String().substring(0, 10),
-                          style: const TextStyle(color: Colors.grey)
-                        ),
-                      ]),
-                      const SizedBox(height: 6),
-                      Text(item.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
-                      Text(item.summary, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.grey)),
-                    ]),
-                  ),
-                ]),
-                const SizedBox(height: 8),
-                Row(children: [
-                  const Icon(Icons.remove_red_eye_outlined, size: 14),
-                  const SizedBox(width: 4),
-                  Text('${item.views}'),
-                  const SizedBox(width: 12),
-                  const Icon(Icons.schedule, size: 14),
-                  const SizedBox(width: 4),
-                  Text(item.readTime),
-                ]),
-                Row(children: [
-                  IconButton(onPressed: onToggleLike, icon: Icon(liked ? Icons.favorite : Icons.favorite_border), color: liked ? Colors.red : Colors.black54),
-                  Text('${item.likes}'),
                   const Spacer(),
-                  IconButton(onPressed: onShare, icon: const Icon(Icons.ios_share_rounded)),
-                ])
-              ]),
-            ),
+                  IconButton(onPressed: onShare, padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: const Icon(Icons.ios_share, size: 20, color: Colors.grey)),
+                  const SizedBox(width: 16),
+                  IconButton(onPressed: onToggleBookmark, padding: EdgeInsets.zero, constraints: const BoxConstraints(), icon: Icon(bookmarked ? Icons.bookmark : Icons.bookmark_border, size: 20, color: bookmarked ? Colors.black87 : Colors.grey)),
+                ],
+              ),
+            ],
           ),
         ),
-      );
+      ),
+    );
+  }
+  Widget _dot() => const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Text('•', style: TextStyle(color: Colors.grey)));
 }
 
-// ... (BadgeChip 위젯은 여기에 그대로 유지됩니다)
-class BadgeChip extends StatelessWidget {
-  const BadgeChip(this.text, {super.key});
+class _ActionChipButton extends StatelessWidget {
+  const _ActionChipButton({
+    required this.isActive,
+    required this.activeColor,
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.onTap,
+    this.isInverted = false,
+  });
 
-  final String text;
+  final bool isActive;
+  final Color activeColor;
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final VoidCallback onTap;
+  final bool isInverted;
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Theme.of(context).primaryColor.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(6),
+  Widget build(BuildContext context) {
+    Widget iconWidget = Icon(icon, size: 20, color: iconColor);
+    if (isInverted) {
+      iconWidget = Transform.rotate(angle: math.pi, child: iconWidget);
+    }
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: isActive ? const EdgeInsets.symmetric(horizontal: 8, vertical: 4) : EdgeInsets.zero,
+        decoration: BoxDecoration(color: isActive ? activeColor : Colors.transparent, borderRadius: BorderRadius.circular(12)),
+        child: Row(
+          children: [
+            iconWidget,
+            const SizedBox(width: 4),
+            Text(label, style: TextStyle(fontSize: 13, color: isActive ? iconColor : Colors.grey, fontWeight: isActive ? FontWeight.bold : FontWeight.normal)),
+          ],
         ),
-        child: Text(text,
-            style: TextStyle(
-                color: Theme.of(context).primaryColor,
-                fontWeight: FontWeight.w600,
-                fontSize: 11)),
-      );
+      ),
+    );
+  }
 }
+
+class CommentsModal extends StatelessWidget {
+  const CommentsModal({super.key, required this.isOpen, required this.onClose, required this.articleId, required this.articleTitle});
+  final bool isOpen;
+  final VoidCallback onClose;
+  final int articleId;
+  final String articleTitle;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isOpen) return const SizedBox.shrink();
+    return Container(
+      height: 340,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -2))],
+      ),
+      child: Column(
+        children: [
+          ListTile(
+            title: const Text('댓글', style: TextStyle(fontWeight: FontWeight.bold)),
+            subtitle: Text(articleTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+            trailing: IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
+          ),
+          const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: const [
+                ListTile(leading: CircleAvatar(backgroundColor: Colors.grey, radius: 14, child: Icon(Icons.person, size: 16, color: Colors.white)), title: Text('뉴스리뷰', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)), subtitle: Text('좋은 기사네요 👍', style: TextStyle(fontSize: 13)), dense: true),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryBadge extends StatelessWidget {
+  const _CategoryBadge(this.text, {super.key});
+  final String text;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(color: const Color(0xFFFFEBEE), borderRadius: BorderRadius.circular(4)),
+      child: Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFD32F2F))),
+    );
+  }
+}
+
+class ImageWithFallback extends StatelessWidget {
+  const ImageWithFallback({super.key, required this.url, this.width, this.height});
+  final String url;
+  final double? width;
+  final double? height;
+  @override
+  Widget build(BuildContext context) {
+    return Image.network(url, width: width, height: height, fit: BoxFit.cover, errorBuilder: (_, __, ___) => Container(width: width, height: height, color: Colors.grey.shade200, alignment: Alignment.center, child: const Icon(Icons.broken_image_outlined, color: Colors.grey)));
+  }
+}
+
+String _formatDate(DateTime dt) { return '${dt.month}월 ${dt.day}일'; }
