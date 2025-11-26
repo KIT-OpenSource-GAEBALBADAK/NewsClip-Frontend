@@ -77,4 +77,26 @@ class NewsListService {
       throw Exception('북마크 처리 중 알 수 없는 오류가 발생했습니다.');
     }
   }
+
+  /// 뉴스 좋아요/싫어요 상호작용
+  /// POST /news/{newsId}/interact
+  Future<Map<String, dynamic>> interactWithNews(
+      int newsId, String interactionType) async {
+    try {
+      final response = await _dio.post(
+        '/news/$newsId/interact',
+        data: {'interaction_type': interactionType},
+      );
+      print('✅ 뉴스 상호작용 ($interactionType) 성공: $newsId');
+      return response.data['data'] as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final errorData = e.response!.data;
+        throw Exception(errorData['message'] ?? '상호작용 처리 중 오류가 발생했습니다.');
+      }
+      throw Exception('네트워크 오류: ${e.message}');
+    } catch (e) {
+      throw Exception('상호작용 처리 중 알 수 없는 오류가 발생했습니다.');
+    }
+  }
 }
