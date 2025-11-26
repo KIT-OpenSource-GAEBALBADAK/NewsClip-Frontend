@@ -59,4 +59,22 @@ class NewsListService {
       throw Exception('알 수 없는 오류 발생: $e');
     }
   }
+
+  /// 뉴스 북마크 토글
+  /// POST /news/{newsId}/bookmark
+  Future<bool> toggleBookmark(int newsId) async {
+    try {
+      final response = await _dio.post('/news/$newsId/bookmark');
+      print('✅ 북마크 토글 성공: $newsId');
+      return response.data['data']['is_bookmarked'] as bool;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final errorData = e.response!.data;
+        throw Exception(errorData['message'] ?? '북마크 처리 중 오류가 발생했습니다.');
+      }
+      throw Exception('네트워크 오류: ${e.message}');
+    } catch (e) {
+      throw Exception('북마크 처리 중 알 수 없는 오류가 발생했습니다.');
+    }
+  }
 }
