@@ -42,7 +42,11 @@ class _NewsReaderScreenState extends State<NewsReaderScreen> {
     });
 
     try {
-      final map = await _tinder.getShorts(size: 10);
+      final int? cursorId = articles.isNotEmpty ? articles.last.shortId : null;
+      final map = await _tinder.getShorts(
+        size: 10,
+        cursorId: cursorId,
+      );
       final data = map['data'] as List<dynamic>?;
 
       if (data != null && data.isNotEmpty) {
@@ -74,17 +78,33 @@ class _NewsReaderScreenState extends State<NewsReaderScreen> {
     return '${dt.month}월 ${dt.day}일';
   }
 
-  void onLike() {
+  void onLike() async {
     if (currentIndex >= articles.length) return;
     final id = articles[currentIndex].shortId;
+
+    try {
+      await _tinder.interactWithShort(id, 'like');
+    } catch (e) {
+      _toast(context, '좋아요 처리 실패: $e');
+      return;
+    }
+
     liked.add(id);
     history.add('like:$id');
     _animateNext();
   }
 
-  void onDislike() {
+  void onDislike() async {
     if (currentIndex >= articles.length) return;
     final id = articles[currentIndex].shortId;
+
+    try {
+      await _tinder.interactWithShort(id, 'dislike');
+    } catch (e) {
+      _toast(context, '싫어요 처리 실패: $e');
+      return;
+    }
+
     disliked.add(id);
     history.add('dislike:$id');
     _animateNext();
