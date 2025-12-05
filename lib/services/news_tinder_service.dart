@@ -54,4 +54,43 @@ class NewsTinderService {
       throw Exception('쇼츠 상호작용 중 알 수 없는 오류 발생: $e');
     }
   }
+
+  /// 쇼츠 댓글 조회
+  Future<Map<String, dynamic>> getShortComments(int shortId) async {
+    try {
+      final response = await _dio.get('/shorts/$shortId/comments');
+      print('✅ 쇼츠 댓글 조회 성공');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final errorData = e.response!.data;
+        throw Exception('쇼츠 댓글 조회 실패: $statusCode - ${errorData?['message'] ?? e.message}');
+      }
+      throw Exception('네트워크 오류: ${e.message}');
+    } catch (e) {
+      throw Exception('쇼츠 댓글 조회 중 알 수 없는 오류 발생: $e');
+    }
+  }
+
+  /// 쇼츠 댓글 작성
+  Future<Map<String, dynamic>> addShortComment(int shortId, String content) async {
+    try {
+      final response = await _dio.post(
+        '/shorts/$shortId/comments',
+        data: {'content': content},
+      );
+      print('✅ 쇼츠 댓글 작성 성공');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final errorData = e.response!.data;
+        throw Exception('쇼츠 댓글 작성 실패: $statusCode - ${errorData?['message'] ?? e.message}');
+      }
+      throw Exception('네트워크 오류: ${e.message}');
+    } catch (e) {
+      throw Exception('쇼츠 댓글 작성 중 알 수 없는 오류 발생: $e');
+    }
+  }
 }

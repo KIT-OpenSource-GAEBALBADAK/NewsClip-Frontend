@@ -1,8 +1,11 @@
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
 
 // AuthService의 logout 함수를 사용하기 위해 import
 import 'auth_service.dart';
+import '../main.dart'; // navigatorKey 접근을 위해 import
+import '../screens/login/login_screen.dart';
 
 /// 중앙 집중식 Dio 인스턴스 관리 서비스
 /// 모든 HTTP 요청에 사용되는 Dio 인스턴스를 싱글톤으로 제공
@@ -46,6 +49,7 @@ class DioService {
           if (refreshToken == null || refreshToken.isEmpty) {
             print('⏹️ 리프레시 토큰이 없어 로그아웃 처리합니다.');
             await logout();
+            _navigateToLogin();
             return handler.next(error);
           }
 
@@ -73,11 +77,13 @@ class DioService {
             } else {
               // 재발급은 성공했으나 응답 형식이 예상과 다를 경우
               await logout();
+              _navigateToLogin();
               return handler.next(error);
             }
           } on DioException catch (_) {
              print('❌ 토큰 재발급 실패. 사용자를 로그아웃 처리합니다.');
              await logout();
+             _navigateToLogin();
              return handler.next(error);
           }
         }
@@ -89,6 +95,21 @@ class DioService {
 
   /// Dio 인스턴스 getter
   Dio get dio => _dio;
+
+  /// 로그인 화면으로 이동 (private)
+  void _navigateToLogin() {
+    // WidgetsBinding을 사용하여 다음 프레임에서 네비게이션 실행
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final context = navigatorKey.currentContext;
+      if (context != null && navigatorKey.currentState != null) {
+        // 모든 화면을 제거하고 로그인 화면으로 이동
+        navigatorKey.currentState!.pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    });
+  }
 
   /// 액세스 토큰 가져오기 (private)
   Future<String?> _getAccessToken() async {

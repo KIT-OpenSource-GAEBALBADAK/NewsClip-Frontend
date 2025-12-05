@@ -28,7 +28,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
   final Map<int, int> _dislikeCounts = {};
 
   final List<String> _categories = const [
-    "정치", "경제", "문화", "환경", "기술",
+    "전체","정치", "경제", "문화", "환경", "기술",
     "스포츠", "라이프스타일", "건강", "교육", "음식", "여행", "패션"
   ];
   late String _activeCategory;
@@ -435,7 +435,7 @@ class _CategoryRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: selected ? Colors.black : Colors.white,
+                    color: selected ? Color(0xFF8B5CF6) : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: selected ? Colors.transparent : Colors.grey.shade300),
                   ),
