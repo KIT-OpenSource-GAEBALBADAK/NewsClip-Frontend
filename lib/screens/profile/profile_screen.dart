@@ -4,6 +4,7 @@ import '../../core/constants/app_colors.dart';
 import '../../services/auth_service.dart';
 import '../../services/profile_service.dart';
 import '../login/login_screen.dart';
+import '../home_screen.dart'; // profileUpdateNotifier 사용
 import 'profile_setup_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -95,6 +96,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 setState(() {
                   _profileFuture = _profileService.getMyProfile();
                 });
+                // 다른 화면에 프로필이 변경되었음을 알림
+                profileUpdateNotifier.value++;
               }
             });
             // 프로필 설정 화면으로 이동하는 동안에는 로딩 인디케이터를 보여줍니다.
