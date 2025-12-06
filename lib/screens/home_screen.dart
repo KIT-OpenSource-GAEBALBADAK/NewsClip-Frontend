@@ -8,6 +8,9 @@ import 'bookmarks/bookmarks_screen.dart';
 import 'profile/profile_screen.dart';
 import '../widgets/common/bottom_navigation.dart';
 
+// 프로필 변경을 알리기 위한 전역 notifier
+final ValueNotifier<int> profileUpdateNotifier = ValueNotifier<int>(0);
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 
