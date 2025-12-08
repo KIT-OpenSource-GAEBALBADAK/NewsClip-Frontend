@@ -407,12 +407,11 @@ class _NewsCard extends StatelessWidget {
     final String fullText = article.summary.replaceAll('\n', '  ');
     final String tag = '#미디어';
 
-    final String title = fullText.length > 20
-        ? fullText.substring(0, 20) + '...'
-        : fullText;
+    // article.title을 제목으로 사용
+    final String title = article.title;
 
-    const double rowHeight = 32.0;
-    const double fontSize = 14.0;
+    const double rowHeight = 32.2;
+    const double fontSize = 15.0;
     const double lineHeight = rowHeight / fontSize;
 
     return Stack(
@@ -496,6 +495,7 @@ class _NewsCard extends StatelessWidget {
                               fontSize: fontSize,
                               color: Color(0xFF6B6B84),
                               height: lineHeight,
+                              fontWeight: FontWeight.bold,
                             ),
                             textAlign: TextAlign.justify,
                           ),

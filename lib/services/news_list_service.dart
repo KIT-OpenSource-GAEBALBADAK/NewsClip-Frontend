@@ -78,7 +78,7 @@ class NewsListService {
     }
   }
 
-  /// 뉴스 좋아요/싫어요 상호작용
+  /// 뉴스 상호작용
   /// POST /news/{newsId}/interact
   Future<Map<String, dynamic>> interactWithNews(
       int newsId, String interactionType) async {
@@ -97,6 +97,59 @@ class NewsListService {
       throw Exception('네트워크 오류: ${e.message}');
     } catch (e) {
       throw Exception('상호작용 처리 중 알 수 없는 오류가 발생했습니다.');
+    }
+  }
+
+  /// 뉴스 댓글 목록 조회
+  /// GET /news/{newsId}/comments
+  Future<Map<String, dynamic>> getNewsComments(int newsId) async {
+    try {
+      final response = await _dio.get('/news/$newsId/comments');
+      print('✅ 댓글 목록 조회 성공: $newsId');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final errorData = e.response!.data;
+
+        if (statusCode == 404) {
+          throw Exception('뉴스를 찾을 수 없습니다');
+        } else if (statusCode == 500) {
+          throw Exception('서버 오류가 발생했습니다');
+        }
+      }
+      throw Exception('네트워크 오류: ${e.message}');
+    } catch (e) {
+      throw Exception('댓글 목록 조회 실패: $e');
+    }
+  }
+
+  /// 뉴스 댓글 작성
+  /// POST /news/{newsId}/comments
+  Future<Map<String, dynamic>> addNewsComment(int newsId, String content) async {
+    try {
+      final response = await _dio.post(
+        '/news/$newsId/comments',
+        data: {'content': content},
+      );
+      print('✅ 댓글 작성 성공: $newsId');
+      return response.data as Map<String, dynamic>;
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final errorData = e.response!.data;
+
+        if (statusCode == 400) {
+          throw Exception(errorData['message'] ?? '잘못된 요청입니다');
+        } else if (statusCode == 404) {
+          throw Exception('뉴스를 찾을 수 없습니다');
+        } else if (statusCode == 500) {
+          throw Exception('서버 오류가 발생했습니다');
+        }
+      }
+      throw Exception('네트워크 오류: ${e.message}');
+    } catch (e) {
+      throw Exception('댓글 작성 실패: $e');
     }
   }
 }
