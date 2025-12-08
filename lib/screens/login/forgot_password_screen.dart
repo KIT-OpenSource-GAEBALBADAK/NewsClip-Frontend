@@ -1,7 +1,7 @@
 import 'dart:math' as math;
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:newsclip/screens/login/register_screen.dart';
+import 'forgot_password_verify_code_screen.dart';
+import '../../services/user_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -13,6 +13,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _email = TextEditingController();
   bool _valid = false;
+  bool _loading = false;
 
   static const _purple = Color(0xFF8B5CF6);
   static const _pink = Color(0xFFEC4899);
@@ -126,20 +127,55 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 ),
               ),
 
-              const SizedBox(height: 32),
+              const Spacer(),
 
               // 인증 버튼
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 150),
-                opacity: _valid ? 1.0 : 0.40,
+                opacity: _valid && !_loading ? 1.0 : 0.40,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(999),
-                  onTap: _valid
-                      ? () {
+                  onTap: _valid && !_loading
+                      ? () async {
                           final email = _email.text.trim();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('인증 코드 전송: $email')),
-                          );
+                          setState(() => _loading = true);
+
+                          try {
+                            print('🔵 [비밀번호 찾기] 인증 코드 전송 시작');
+                            print('🔵 [비밀번호 찾기] email: $email');
+                            print('🔵 [비밀번호 찾기] type: reset');
+
+                            // POST /auth/email/send-code (type: "reset")
+                            await UserService().sendVerificationCode(
+                              email: email,
+                              type: 'reset',
+                            );
+
+                            if (!mounted) return;
+
+                            // 성공 시 인증 코드 입력 화면으로 이동
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => ForgotPasswordVerifyCodeScreen(
+                                  email: email,
+                                ),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!mounted) return;
+
+                            // 에러 메시지 표시
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(e.toString()),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          } finally {
+                            if (mounted) {
+                              setState(() => _loading = false);
+                            }
+                          }
                         }
                       : null,
                   child: Container(
@@ -153,14 +189,23 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       borderRadius: BorderRadius.circular(999),
                     ),
                     alignment: Alignment.center,
-                    child: const Text(
-                      '인증 코드 전송',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                    child: _loading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            '인증 코드 전송',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                   ),
                 ),
               ),
