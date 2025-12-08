@@ -7,6 +7,7 @@ import '../../services/auth_service.dart';
 import '../community/community_screen.dart';
 import '../../services/community_service.dart';
 import '../login/login_screen.dart';
+
 import '../../models/profile_lists.dart';
 
 // [수정] 방금 만드신 ProfileService import

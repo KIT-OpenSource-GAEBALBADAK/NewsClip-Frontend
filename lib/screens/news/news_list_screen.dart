@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/news_item.dart';
 import '../../services/news_list_service.dart';
+import '../../services/profile_service.dart';
+import '../home_screen.dart'; // profileUpdateNotifier 사용
 import 'news_reader_screen.dart';
 
 class NewsListScreen extends StatefulWidget {
@@ -17,6 +19,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   final ScrollController _scrollCtrl = ScrollController();
   final NewsListService _newsService = NewsListService();
+  final ProfileService _profileService = ProfileService();
 
   List<NewsItem> _allNews = [];
   List<NewsItem> _filtered = [];
@@ -27,8 +30,12 @@ class _NewsListScreenState extends State<NewsListScreen> {
   final Set<int> _bookmarked = {};
   final Map<int, int> _dislikeCounts = {};
 
+  // 프로필 정보
+  String? _userProfileImage;
+  String? _userName;
+
   final List<String> _categories = const [
-    "정치", "경제", "문화", "환경", "기술",
+    "전체","정치", "경제", "문화", "환경", "기술",
     "스포츠", "라이프스타일", "건강", "교육", "음식", "여행", "패션"
   ];
   late String _activeCategory;
@@ -46,6 +53,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
   void initState() {
     super.initState();
     _activeCategory = _categories.first;
+    _loadProfile();
     _loadNews(isRefresh: true);
     _scrollCtrl.addListener(() {
       if (_scrollCtrl.position.pixels >=
@@ -55,13 +63,35 @@ class _NewsListScreenState extends State<NewsListScreen> {
         _loadNews();
       }
     });
+
+    // 프로필 변경 감지
+    profileUpdateNotifier.addListener(_onProfileUpdated);
   }
 
   @override
   void dispose() {
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
+    profileUpdateNotifier.removeListener(_onProfileUpdated);
     super.dispose();
+  }
+
+  void _onProfileUpdated() {
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final response = await _profileService.getMyProfile();
+      final data = response['data'];
+      setState(() {
+        _userProfileImage = data['profile_image'] as String?;
+        _userName = data['nickname'] as String?;
+      });
+    } catch (e) {
+      debugPrint('프로필 로드 실패: $e');
+      // 실패해도 기본 이미지로 표시되므로 에러 무시
+    }
   }
 
   Future<void> _loadNews({bool isRefresh = false}) async {
@@ -136,7 +166,10 @@ class _NewsListScreenState extends State<NewsListScreen> {
         child: Column(
           children: [
             const SizedBox(height: 8),
-            const _Header(),
+            _Header(
+              profileImage: _userProfileImage,
+              userName: _userName,
+            ),
 
             // 🔹 검색창 영역 (위아래 경계선 추가)
             Column(
@@ -331,7 +364,13 @@ class _NewsListScreenState extends State<NewsListScreen> {
 }
 
 class _Header extends StatelessWidget {
-  const _Header();
+  const _Header({
+    this.profileImage,
+    this.userName,
+  });
+
+  final String? profileImage;
+  final String? userName;
 
   @override
   Widget build(BuildContext context) {
@@ -339,18 +378,34 @@ class _Header extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 20,
-            backgroundImage: NetworkImage('https://i.pravatar.cc/150?img=11'),
-            backgroundColor: Colors.grey,
-          ),
+          // 프로필 이미지 - 실제 사용자 이미지 또는 기본 이미지
+          profileImage != null && profileImage!.isNotEmpty
+              ? CircleAvatar(
+                  radius: 20,
+                  backgroundImage: NetworkImage(profileImage!),
+                  backgroundColor: Colors.grey,
+                  onBackgroundImageError: (_, __) {
+                    // 이미지 로드 실패 시 처리
+                  },
+                )
+              : const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFF8B5CF6),
+                  child: Icon(Icons.person, color: Colors.white, size: 24),
+                ),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('안녕하세요 👋', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              SizedBox(height: 2),
-              Text('오늘의 뉴스를 확인해보세요', style: TextStyle(fontSize: 12, color: Colors.grey)),
+            children: [
+              Text(
+                userName != null ? '안녕하세요, $userName님 👋' : '안녕하세요 👋',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 2),
+              const Text(
+                '오늘의 뉴스를 확인해보세요',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
             ],
           ),
           const Spacer(),
@@ -435,7 +490,7 @@ class _CategoryRow extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: selected ? Colors.black : Colors.white,
+                    color: selected ? Color(0xFF8B5CF6) : Colors.white,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(color: selected ? Colors.transparent : Colors.grey.shade300),
                   ),

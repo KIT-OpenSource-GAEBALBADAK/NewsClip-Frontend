@@ -8,6 +8,7 @@ import 'providers/app_provider.dart';
 import 'screens/login/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'services/auth_service.dart';
+import 'main.dart'; // navigatorKey를 사용하기 위해 import
 
 // StatelessWidget을 StatefulWidget으로 변경
 class NewsClipApp extends StatefulWidget {
@@ -35,7 +36,8 @@ class _NewsClipAppState extends State<NewsClipApp> {
         return MaterialApp(
           title: 'NewsClip',
           debugShowCheckedModeBanner: false,
-          
+          navigatorKey: navigatorKey, // 전역 Navigator Key 등록
+
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: appProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
