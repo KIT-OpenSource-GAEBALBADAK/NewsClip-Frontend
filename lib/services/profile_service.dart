@@ -2,6 +2,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'dio_service.dart';
+import 'package:newsclip/models/profile_lists.dart';
 
 class ProfileService {
   late final Dio _dio;
@@ -23,7 +24,7 @@ class ProfileService {
 
       debugPrint('✅ 프로필 조회 성공');
       // 인터셉터에서 재시도 후 성공하면 여기에 도달합니다.
-      return response.data as Map<String, dynamic>;
+      return response.data['data'] as Map<String, dynamic>;
 
     } on DioException catch (e) {
       debugPrint('❌ DioException 발생: ${e.message}');
@@ -119,6 +120,98 @@ class ProfileService {
       }
 
       throw '프로필 설정 중 오류가 발생했습니다.';
+    } catch (e) {
+      debugPrint('❌ 예상치 못한 오류: $e');
+      rethrow;
+    }
+  }
+
+  /// 7.7 내가 쓴 게시글 목록 조회
+  /// GET /me/posts
+  Future<MyPostList> getMyPosts({int page = 1, int size = 10}) async {
+    try {
+      debugPrint('🔵 내가 쓴 게시글 목록 조회 요청: page=$page, size=$size');
+
+      final response = await _dio.get(
+        '/me/posts',
+        queryParameters: {
+          'page': page,
+          'size': size,
+        },
+      );
+
+      debugPrint('✅ 내가 쓴 게시글 목록 조회 성공');
+      debugPrint('🔥 [DEBUG] 서버 응답 데이터(response.data["data"]): ${response.data['data']}');
+      // response.data['data'] 전체를 넘겨서 MyPostList(페이징 정보 + 리스트)로 변환
+      return MyPostList.fromJson(response.data['data']);
+
+    } on DioException catch (e) {
+      debugPrint('❌ 내가 쓴 게시글 조회 실패: ${e.message}');
+
+      // 기존 에러 처리 로직과 통일성 유지
+      if (e.response?.statusCode == 401) {
+        throw '로그인이 필요합니다.';
+      }
+
+      final data = e.response?.data;
+      if (data is Map && data.containsKey('message')) {
+        throw data['message'];
+      }
+
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw '서버 응답 시간이 초과되었습니다.';
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        throw '네트워크 연결을 확인해주세요.';
+      }
+
+      throw '게시글 목록을 불러오는 중 오류가 발생했습니다.';
+    } catch (e) {
+      debugPrint('❌ 예상치 못한 오류: $e');
+      rethrow;
+    }
+  }
+
+  /// 7.8 내가 쓴 댓글 목록 조회
+  /// GET /me/comments
+  Future<MyCommentList> getMyComments({int page = 1, int size = 10}) async {
+    try {
+      debugPrint('🔵 내가 쓴 댓글 목록 조회 요청: page=$page, size=$size');
+
+      final response = await _dio.get(
+        '/me/comments',
+        queryParameters: {
+          'page': page,
+          'size': size,
+        },
+      );
+
+      debugPrint('✅ 내가 쓴 댓글 목록 조회 성공');
+      // response.data['data'] 전체를 넘겨서 MyCommentList(페이징 정보 + 리스트)로 변환
+      return MyCommentList.fromJson(response.data['data']);
+
+    } on DioException catch (e) {
+      debugPrint('❌ 내가 쓴 댓글 조회 실패: ${e.message}');
+
+      if (e.response?.statusCode == 401) {
+        throw '로그인이 필요합니다.';
+      }
+
+      final data = e.response?.data;
+      if (data is Map && data.containsKey('message')) {
+        throw data['message'];
+      }
+
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw '서버 응답 시간이 초과되었습니다.';
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        throw '네트워크 연결을 확인해주세요.';
+      }
+
+      throw '댓글 목록을 불러오는 중 오류가 발생했습니다.';
     } catch (e) {
       debugPrint('❌ 예상치 못한 오류: $e');
       rethrow;
