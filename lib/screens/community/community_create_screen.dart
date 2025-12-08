@@ -293,20 +293,49 @@ class _NewPostScreenState extends State<NewPostScreen> {
           ],
         ),
         const SizedBox(height: 8),
-        Container(
+
+        SizedBox(
           height: 40,
-          decoration: BoxDecoration(
-            color: fieldBg,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: TextField(
             controller: _title,
             maxLength: 100,
-            decoration: const InputDecoration(
-              border: InputBorder.none,
+            textAlignVertical: TextAlignVertical.center,
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: fieldBg,
               counterText: '',
               hintText: '어떤 이야기를 들려주고 싶으신가요?',
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+
+              // 1. [평소 상태]
+              // 투명하거나 배경색과 같은 색이 아니라, '연한 보라색'을 지정합니다.
+              // width는 1.5로 유지하여 클릭 시 흔들림을 방지합니다.
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0x268B5CF6), // 👈 연한 보라색 (borderPurple)
+                  width: 1.5,               // 👈 두께 유지 (아다리 맞춤용)
+                ),
+              ),
+
+              // 2. [클릭 상태]
+              // 진한 보라색으로 색상만 변경됩니다.
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: purple, // 👈 진한 보라색
+                  width: 1.5,
+                ),
+              ),
+
+              // 3. 기본 테두리
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0x268B5CF6),
+                  width: 1.5,
+                ),
+              ),
             ),
             onChanged: (_) => setState(() {}),
           ),

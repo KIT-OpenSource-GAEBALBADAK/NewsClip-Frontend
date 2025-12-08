@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+// [수정] 모델과 서비스 임포트
 import 'package:newsclip/models/community.dart';
+import 'package:newsclip/services/community_service.dart';
 
 enum CommentSortType { latest, popular }
 
 class CommentSheet extends StatefulWidget {
-  // 🔽 [수정] 'Post' -> 'CommunityPost'
   final CommunityPost post;
 
   const CommentSheet({
@@ -16,95 +17,54 @@ class CommentSheet extends StatefulWidget {
   State<CommentSheet> createState() => _CommentSheetState();
 }
 
-// ===== 데이터 모델 =====
-// (CommentItem, ReplyItem 클래스는 변경 없음)
-// ... (이하 CommentItem, ReplyItem 모델 클래스)
-class ReplyItem {
-  final String id;
-  final String authorName;
-  final String timeAgo;
-  final DateTime createdAt;
-  String content;
-  int likes;
-  bool liked;
+// ❌ [삭제] 기존 파일 내에 있던 CommentItem, ReplyItem 클래스 정의 삭제
+// (models/community.dart의 CommentItem을 사용합니다)
 
-  ReplyItem({
-    required this.id,
-    required this.authorName,
-    required this.timeAgo,
-    required this.createdAt,
-    required this.content,
-    this.likes = 0,
-    this.liked = false,
-  });
+// UI에서 '답글' 기능을 위한 껍데기 클래스 (API 미지원으로 비워둠)
+class ReplyItemStub {
+  // 실제 사용되지 않음, 에러 방지용
 }
-
-class CommentItem {
-  final String id;
-  final String authorName;
-  final bool isExpert;
-  final String? expertTag;
-  final String timeAgo;
-  final DateTime createdAt;
-
-  String content;
-  int likes;
-  int dislikes;
-  bool liked;
-  bool disliked;
-
-  List<ReplyItem> replies;
-  bool repliesExpanded;
-
-  CommentItem({
-    required this.id,
-    required this.authorName,
-    this.isExpert = false,
-    this.expertTag,
-    required this.timeAgo,
-    required this.createdAt,
-    required this.content,
-    this.likes = 0,
-    this.dislikes = 0,
-    this.liked = false,
-    this.disliked = false,
-    this.replies = const [],
-    this.repliesExpanded = false,
-  });
-}
-// ... (모델 클래스 끝)
-
 
 class _CommentSheetState extends State<CommentSheet> {
   final TextEditingController _inputController = TextEditingController();
 
-  // 🔽 [수정] Mock Data를 제거하고, 빈 리스트로 초기화합니다.
-  // (나중에 이 리스트를 서버에서 받아오도록 initState에서 FutureBuilder로 변경해야 함)
+  // [추가] 서비스 인스턴스
+  final CommunityService _communityService = CommunityService();
+
+  // [수정] models/community.dart의 CommentItem 사용
   List<CommentItem> _comments = [];
+  bool _isLoading = true; // 로딩 상태
+
+  // 답글 대상 (API 6.2는 대댓글 미지원이므로 기능 비활성화용)
   CommentItem? _activeReplyTarget;
   CommentSortType _sortType = CommentSortType.latest;
 
   @override
   void initState() {
     super.initState();
-    // 🔽 [제거] Mock Data 생성 로직 전체 삭제
-    // _comments = [ ... ];
-
-    // TODO: 서버에서 댓글을 불러오는 로직이 필요합니다.
-    // _fetchComments();
+    // [수정] 시작하자마자 서버에서 댓글 불러오기
+    _fetchComments();
   }
 
-  // TODO: (예시) 서버에서 댓글을 불러오는 함수
-  // Future<void> _fetchComments() async {
-  //   try {
-  //     // final comments = await commentService.getComments(widget.post.postId);
-  //     // setState(() {
-  //     //   _comments = comments;
-  //     // });
-  //   } catch (e) {
-  //     // 에러 처리
-  //   }
-  // }
+  // [구현] 실제 서버 연동 함수
+  Future<void> _fetchComments() async {
+    try {
+      final comments = await _communityService.getComments(widget.post.postId);
+      if (mounted) {
+        setState(() {
+          _comments = comments;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('댓글 로딩 실패: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -113,14 +73,15 @@ class _CommentSheetState extends State<CommentSheet> {
   }
 
   // ====== 정렬 ======
-
   List<CommentItem> get _sortedComments {
     final list = [..._comments];
     if (_sortType == CommentSortType.latest) {
+      // 최신순 (createdAt 기준 내림차순)
       list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     } else {
-      // 인기순: 좋아요 많은 순
-      list.sort((a, b) => b.likes.compareTo(a.likes));
+      // 인기순 (API 6.1에 좋아요 수 데이터가 없으므로 정렬 불가 -> 최신순 유지)
+      // 추후 API 업데이트 시 구현
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     }
     return list;
   }
@@ -136,123 +97,67 @@ class _CommentSheetState extends State<CommentSheet> {
   String get _sortLabel =>
       _sortType == CommentSortType.latest ? '최신순' : '인기순';
 
-  // ====== 좋아요 / 싫어요 ======
-  // (이하 _toggleLike, _toggleDislike, _toggleReplyLike 로직은 변경 없음)
-  // ...
+  // ====== 좋아요 / 싫어요 (API 6.1 미지원으로 기능 비활성화) ======
   void _toggleLike(CommentItem c) {
-    setState(() {
-      if (c.liked) {
-        c.liked = false;
-        c.likes = (c.likes - 1).clamp(0, 999999);
-      } else {
-        c.liked = true;
-        c.likes += 1;
-        if (c.disliked) {
-          c.disliked = false;
-          c.dislikes = (c.dislikes - 1).clamp(0, 999999);
-        }
-      }
-    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('댓글 좋아요 기능은 아직 준비 중입니다.')),
+    );
   }
 
   void _toggleDislike(CommentItem c) {
-    setState(() {
-      if (c.disliked) {
-        c.disliked = false;
-        c.dislikes = (c.dislikes - 1).clamp(0, 999999);
-      } else {
-        c.disliked = true;
-        c.dislikes += 1;
-        if (c.liked) {
-          c.liked = false;
-          c.likes = (c.likes - 1).clamp(0, 999999);
-        }
-      }
-    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('댓글 싫어요 기능은 아직 준비 중입니다.')),
+    );
   }
-
-  void _toggleReplyLike(CommentItem parent, ReplyItem r) {
-    setState(() {
-      r.liked = !r.liked;
-      r.likes += r.liked ? 1 : -1;
-      if (r.likes < 0) r.likes = 0;
-    });
-  }
-  // ...
 
   // ====== 댓글 / 답글 추가 ======
-
-  void _addCommentOrReply() {
+  void _addCommentOrReply() async {
     final text = _inputController.text.trim();
     if (text.isEmpty) return;
 
-    final now = DateTime.now();
+    // [API 한계] 현재 대댓글(답글) 작성 API가 없으므로 막아둠
+    if (_activeReplyTarget != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('답글 작성 기능은 아직 서버가 지원하지 않습니다.')),
+      );
+      return;
+    }
 
-    setState(() {
-      if (_activeReplyTarget == null) {
-        // 원 댓글 추가
-        _comments.insert(
-          0,
-          CommentItem(
-            id: now.millisecondsSinceEpoch.toString(),
-            authorName: '미소', // TODO: 로그인 유저 이름으로 교체
-            timeAgo: '방금 전',
-            createdAt: now,
-            content: text,
-          ),
+    try {
+      // 1. 서버 전송
+      await _communityService.createComment(widget.post.postId, text);
+
+      // 2. 입력창 초기화
+      _inputController.clear();
+      FocusScope.of(context).unfocus();
+
+      // 3. 목록 새로고침 & 댓글 수 증가 (UI 반영)
+      await _fetchComments();
+      setState(() {
+        widget.post.commentCount++;
+      });
+
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('댓글 작성 실패: $e')),
         );
-        // 🔽 [수정] 'widget.post'는 이제 'CommunityPost' 타입
-        widget.post.commentCount += 1;
-      } else {
-        // 답글 추가 (원 댓글에만)
-        final target = _activeReplyTarget!;
-        target.repliesExpanded = true;
-        target.replies = [
-          ReplyItem(
-            id: now.millisecondsSinceEpoch.toString(),
-            authorName: '미소',
-            timeAgo: '방금 전',
-            createdAt: now,
-            content: text,
-          ),
-          ...target.replies,
-        ];
       }
-    });
-
-    _inputController.clear();
-    setState(() => _activeReplyTarget = null);
-    FocusScope.of(context).unfocus();
+    }
   }
 
   // ====== 신고 ======
-  // (이하 _reportComment, _reportReply 로직은 변경 없음)
-  // ...
   void _reportComment(CommentItem c) {
-    // TODO: 실제 신고 API 연동
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('"${c.authorName}"님의 댓글을 신고했습니다.'),
+        content: Text('"${c.author.nickname}"님의 댓글을 신고했습니다.'),
         duration: const Duration(seconds: 2),
       ),
     );
   }
-
-  void _reportReply(CommentItem parent, ReplyItem r) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('"${r.authorName}"님의 답글을 신고했습니다.'),
-        duration: const Duration(seconds: 2),
-      ),
-    );
-  }
-  // ...
 
   @override
   Widget build(BuildContext context) {
-    // (이하 build 메서드 내의 UI 코드는 모두 동일합니다)
-    // ...
-    const accent = Color(0xFF8B5CF6);
     const dividerColor = Color(0xFFE5E5F0);
     const textSub = Color(0xFF6B6B84);
     const textMain = Color(0xFF0A0A0A);
@@ -281,7 +186,7 @@ class _CommentSheetState extends State<CommentSheet> {
               ),
               const SizedBox(height: 8),
 
-              // ===== 헤더: 댓글 N개 + 정렬 필터 + X =====
+              // ===== 헤더 =====
               Padding(
                 padding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -292,7 +197,6 @@ class _CommentSheetState extends State<CommentSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            // 🔽 [수정] _comments.length -> widget.post.commentCount
                             '댓글 ${widget.post.commentCount}개',
                             style: const TextStyle(
                               fontSize: 16,
@@ -313,7 +217,37 @@ class _CommentSheetState extends State<CommentSheet> {
                         ],
                       ),
                     ),
-                    // ... (정렬 필터, 닫기 버튼 동일)
+                    // 정렬 필터
+                    InkWell(
+                      onTap: _toggleSortType,
+                      borderRadius: BorderRadius.circular(4),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4.0),
+                        child: Row(
+                          children: [
+                            Text(
+                              _sortLabel,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: textSub,
+                              ),
+                            ),
+                            const Icon(Icons.keyboard_arrow_down,
+                                size: 16, color: textSub),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    InkWell(
+                      onTap: () => Navigator.pop(context),
+                      borderRadius: BorderRadius.circular(20),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4.0),
+                        child: Icon(Icons.close, size: 24, color: textMain),
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -321,8 +255,9 @@ class _CommentSheetState extends State<CommentSheet> {
 
               // ===== 댓글 리스트 =====
               Expanded(
-                // 🔽 [수정] 댓글이 0개일 때(서버 연동 전)를 대비한 UI 추가
-                child: sorted.isEmpty
+                child: _isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : sorted.isEmpty
                     ? const Center(
                   child: Text(
                     '아직 댓글이 없습니다.\n첫 번째 댓글을 작성해보세요.',
@@ -340,18 +275,15 @@ class _CommentSheetState extends State<CommentSheet> {
                       onLike: () => _toggleLike(c),
                       onDislike: () => _toggleDislike(c),
                       onReplyTap: () {
-                        setState(() {
-                          _activeReplyTarget = c;
-                        });
+                        // 대댓글 미지원이므로 기능 제한
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('답글 기능은 준비 중입니다.')),
+                        );
                       },
                       onToggleReplies: () {
-                        setState(() {
-                          c.repliesExpanded = !c.repliesExpanded;
-                        });
+                        // 대댓글 없음
                       },
                       onReport: () => _reportComment(c),
-                      onReplyLike: (reply) => _toggleReplyLike(c, reply),
-                      onReportReply: (reply) => _reportReply(c, reply),
                     );
                   },
                   separatorBuilder: (_, __) => const SizedBox(height: 12),
@@ -361,18 +293,78 @@ class _CommentSheetState extends State<CommentSheet> {
 
               const Divider(height: 1, color: dividerColor),
 
-              // ... (이하 답글 대상 표시 바, 하단 입력 영역은 모두 동일) ...
+              // ===== 하단 입력창 =====
+              // (답글 대상 표시 바는 대댓글 미지원이므로 일단 숨김 처리될 것임)
               if (_activeReplyTarget != null)
                 Container(
-                  // ...
+                  width: double.infinity,
+                  color: const Color(0xFFF8F7FF),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Text(
+                        // API 데이터 불일치로 닉네임 사용
+                        'To. ${_activeReplyTarget!.author.nickname}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: Color(0xFF8B5CF6),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      InkWell(
+                        onTap: () => setState(() => _activeReplyTarget = null),
+                        child: const Icon(Icons.close,
+                            size: 16, color: Color(0xFF6B6B84)),
+                      ),
+                    ],
+                  ),
                 ),
               Padding(
                 padding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 child: Row(
-                  // ...
+                  children: [
+                    Expanded(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF3F4F6),
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: TextField(
+                          controller: _inputController,
+                          // onSubmitted: (_) => _addCommentOrReply(), // 엔터키 전송 원하면 주석 해제
+                          decoration: const InputDecoration(
+                            hintText: '따뜻한 댓글을 남겨주세요...',
+                            hintStyle: TextStyle(
+                                color: Color(0xFF9CA3AF), fontSize: 14),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                            isDense: true,
+                          ),
+                          style: const TextStyle(fontSize: 14),
+                          maxLines: null,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: _addCommentOrReply,
+                      borderRadius: BorderRadius.circular(20),
+                      child: CircleAvatar(
+                        radius: 20,
+                        backgroundColor: const Color(0xFF8B5CF6),
+                        child: const Icon(Icons.arrow_upward,
+                            color: Colors.white, size: 20),
+                      ),
+                    ),
+                  ],
                 ),
               ),
+              // 키보드 올라왔을 때 여백
+              SizedBox(height: MediaQuery.of(context).viewInsets.bottom),
             ],
           ),
         ),
@@ -381,18 +373,14 @@ class _CommentSheetState extends State<CommentSheet> {
   }
 }
 
-// ====== 개별 댓글 카드 ======
-// (이하 _CommentCard, _ReplyItem, _AvatarCircle 클래스는 변경 없음)
-// ...
+// ====== 개별 댓글 카드 (수정됨) ======
 class _CommentCard extends StatelessWidget {
-  final CommentItem data;
+  final CommentItem data; // models/community.dart의 모델
   final VoidCallback onLike;
   final VoidCallback onDislike;
   final VoidCallback onReplyTap;
   final VoidCallback onToggleReplies;
   final VoidCallback onReport;
-  final void Function(ReplyItem reply) onReplyLike;
-  final void Function(ReplyItem reply) onReportReply;
 
   const _CommentCard({
     required this.data,
@@ -401,9 +389,16 @@ class _CommentCard extends StatelessWidget {
     required this.onReplyTap,
     required this.onToggleReplies,
     required this.onReport,
-    required this.onReplyLike,
-    required this.onReportReply,
   });
+
+  // [추가] 날짜 계산 헬퍼 함수
+  String _formatTimeAgo(DateTime date) {
+    final diff = DateTime.now().difference(date);
+    if (diff.inMinutes < 1) return '방금 전';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+    if (diff.inHours < 24) return '${diff.inHours}시간 전';
+    return '${diff.inDays}일 전';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -411,6 +406,19 @@ class _CommentCard extends StatelessWidget {
     const textSub = Color(0xFF6B6B84);
     const cardBorder = Color(0x268B5CF6);
     const textMain = Color(0xFF0A0A0A);
+
+    // API 6.1에 없는 데이터는 기본값 처리
+    final authorName = data.author.nickname;
+    final isExpert = data.author.role == 'expert';
+    final expertTag = isExpert ? '전문가' : null;
+    final timeAgo = _formatTimeAgo(data.createdAt);
+
+    // API 6.1에는 좋아요 수, 좋아요 여부, 답글 목록이 없으므로 0/false/empty 처리
+    final likes = 0;
+    final liked = false;
+    final disliked = false;
+    final hasReplies = false; // 답글 없음
+    final repliesExpanded = false;
 
     return Container(
       decoration: BoxDecoration(
@@ -426,7 +434,7 @@ class _CommentCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AvatarCircle(label: data.authorName.characters.first),
+              _AvatarCircle(label: authorName.isNotEmpty ? authorName.characters.first : '?'),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -435,7 +443,7 @@ class _CommentCard extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          data.authorName,
+                          authorName,
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -443,7 +451,7 @@ class _CommentCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        if (data.isExpert)
+                        if (isExpert)
                           Container(
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 4, vertical: 1),
@@ -461,21 +469,12 @@ class _CommentCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        if (data.expertTag != null) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            data.expertTag!,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: accent,
-                            ),
-                          ),
-                        ],
+                        // expertTag가 별도로 있다면 표시 (현재는 role로 처리)
                       ],
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      data.timeAgo,
+                      timeAgo,
                       style: const TextStyle(
                         fontSize: 12,
                         color: textSub,
@@ -518,7 +517,7 @@ class _CommentCard extends StatelessWidget {
 
           const SizedBox(height: 8),
 
-          // 좋아요 / 싫어요 / 답글
+          // 좋아요 / 싫어요 / 답글 (UI는 유지하되 데이터는 0/false)
           Row(
             children: [
               InkWell(
@@ -527,16 +526,16 @@ class _CommentCard extends StatelessWidget {
                 child: Row(
                   children: [
                     Icon(
-                      data.liked
+                      liked
                           ? Icons.thumb_up
                           : Icons.thumb_up_alt_outlined,
                       size: 18,
-                      color: data.liked ? accent : textSub,
+                      color: liked ? accent : textSub,
                     ),
                     const SizedBox(width: 4),
-                    if (data.likes > 0)
+                    if (likes > 0)
                       Text(
-                        '${data.likes}',
+                        '$likes',
                         style: const TextStyle(
                           fontSize: 12,
                           color: textSub,
@@ -550,11 +549,11 @@ class _CommentCard extends StatelessWidget {
                 onTap: onDislike,
                 borderRadius: BorderRadius.circular(20),
                 child: Icon(
-                  data.disliked
+                  disliked
                       ? Icons.thumb_down
                       : Icons.thumb_down_alt_outlined,
                   size: 18,
-                  color: data.disliked ? accent : textSub,
+                  color: disliked ? accent : textSub,
                 ),
               ),
               const SizedBox(width: 16),
@@ -573,8 +572,8 @@ class _CommentCard extends StatelessWidget {
             ],
           ),
 
-          // ===== 답글 토글 / 리스트 =====
-          if (data.replies.isNotEmpty) ...[
+          // ===== 답글 (API 미지원으로 표시 안 함) =====
+          if (hasReplies) ...[
             const SizedBox(height: 8),
             InkWell(
               onTap: onToggleReplies,
@@ -582,13 +581,21 @@ class _CommentCard extends StatelessWidget {
               child: Row(
                 children: [
                   Icon(
-                    data.repliesExpanded
+                    repliesExpanded
                         ? Icons.expand_less
-                        : Icons.expand_more, // 이 부분이 잘렸습니다.
+                        : Icons.expand_more,
                     size: 20,
                     color: accent,
                   ),
-                  // ... 이하 코드가 잘렸습니다.
+                  const SizedBox(width: 4),
+                  const Text(
+                    '답글 보기',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -599,8 +606,7 @@ class _CommentCard extends StatelessWidget {
   }
 }
 
-// ... _AvatarCircle 및 _ReplyItem 위젯 ...
-// (이전 코드와 동일하므로 생략)
+// _AvatarCircle 위젯은 그대로 유지
 class _AvatarCircle extends StatelessWidget {
   final String label;
   const _AvatarCircle({required this.label});

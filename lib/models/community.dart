@@ -73,10 +73,11 @@ class CommunityPost {
   /// JSON 맵(Map)에서 CommunityPost 객체를 생성하는 팩토리 생성자
   /// (5.1 목록 조회, 5.2 작성 응답 모두 호환 가능)
   factory CommunityPost.fromJson(Map<String, dynamic> json) {
+
     return CommunityPost(
       // [수정] 5.1 'postId'(String) / 5.2 'ID'(int or String) -> .toString()으로 통일
-      postId: (json['postId'] ?? json['ID']).toString(),
-
+      //postId: (json['postId'] ?? json['ID'] ?? json['id'] ?? json['post_id'] ?? 0).toString(),
+      postId: (json['postId'] ?? json['post_id'] ?? json['id'] ?? json['ID'] ?? 0).toString(),
       // [수정] 5.1 'title' / 5.2 'Title'
       title: json['title'] as String? ?? json['Title'] as String,
 
@@ -106,7 +107,8 @@ class CommunityPost {
       dislikeCount: json['dislikeCount'] as int? ?? json['DislikeCount'] as int? ?? 0,
       commentCount: json['commentCount'] as int? ?? json['CommentCount'] as int? ?? 0,
 
-      // 'isLiked', 'isDisliked'는 API 응답에 없으므로 기본값 false 사용
+      isLiked: json['isLiked'] as bool? ?? json['is_liked'] as bool? ?? false,
+      isDisliked: json['isDisliked'] as bool? ?? json['is_disliked'] as bool? ?? false,
     );
   }
 
@@ -138,5 +140,30 @@ class CommunityPost {
         isLiked = false;
       }
     }
+  }
+}
+
+/// API 명세 6.1 댓글 객체 모델
+class CommentItem {
+  final int commentId;
+  final String content;
+  final DateTime createdAt;
+  final PostAuthor author; // 기존에 정의된 PostAuthor 재사용
+
+  CommentItem({
+    required this.commentId,
+    required this.content,
+    required this.createdAt,
+    required this.author,
+  });
+
+  factory CommentItem.fromJson(Map<String, dynamic> json) {
+    return CommentItem(
+      commentId: json['comment_id'] as int,
+      content: json['content'] as String? ?? '', // null 방지
+      createdAt: DateTime.parse(json['created_at'] as String),
+      // API 응답의 'user' 객체를 PostAuthor.fromJson으로 넘겨서 처리
+      author: PostAuthor.fromJson(json['user'] as Map<String, dynamic>),
+    );
   }
 }
