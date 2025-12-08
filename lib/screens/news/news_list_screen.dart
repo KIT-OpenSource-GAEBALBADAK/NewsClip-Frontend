@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/news_item.dart';
+import '../../models/comment.dart';
 import '../../services/news_list_service.dart';
 import '../../services/profile_service.dart';
 import '../home_screen.dart'; // profileUpdateNotifier 사용
@@ -162,6 +163,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      resizeToAvoidBottomInset: false, // 키보드가 나타나도 레이아웃 조정 안함
       body: SafeArea(
         child: Column(
           children: [
@@ -343,15 +345,74 @@ class _NewsListScreenState extends State<NewsListScreen> {
                       },
                     ),
                   ),
+                  // 댓글 조회 모달 (완전히 고정 - 절대 위치 사용)
                   if (_commentsTarget != null)
-                    Positioned(
-                      bottom: 0, left: 0, right: 0,
-                      child: CommentsModal(
-                        isOpen: _commentsOpen,
-                        onClose: () => setState(() { _commentsOpen = false; _commentsTarget = null; }),
-                        articleId: _commentsTarget!.id,
-                        articleTitle: _commentsTarget!.title,
-                      ),
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        // Stack의 전체 높이 기준으로 하단 340px 위치에 고정
+                        final topPosition = constraints.maxHeight - 340;
+
+                        return Positioned(
+                          left: 0,
+                          right: 0,
+                          top: topPosition, // 절대 위치로 고정
+                          height: 340,
+                          child: _CommentsModal(
+                            newsId: _commentsTarget!.id,
+                            newsTitle: _commentsTarget!.title,
+                            onClose: () => setState(() {
+                              _commentsOpen = false;
+                              _commentsTarget = null;
+                            }),
+                          ),
+                        );
+                      },
+                    ),
+                  // 댓글 입력창 (키보드 위로 이동 - 별도 Builder로 키보드 감지)
+                  if (_commentsTarget != null)
+                    Builder(
+                      builder: (outerContext) {
+                        // 원본 context에서 키보드 높이 가져오기
+                        final keyboardHeight = MediaQuery.of(outerContext).viewInsets.bottom;
+                        return Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: keyboardHeight, // 키보드 높이만큼 위로
+                          child: _CommentInputBar(
+                            newsId: _commentsTarget!.id,
+                            onCommentAdded: () {
+                              // 댓글 작성 후 모달 새로고침 및 댓글 개수 업데이트
+                              setState(() {
+                                // _allNews와 _filtered 모두에서 댓글 개수 증가
+                                final allIndex = _allNews.indexWhere((n) => n.id == _commentsTarget!.id);
+                                if (allIndex != -1) {
+                                  _allNews[allIndex] = _allNews[allIndex].copyWith(
+                                    comments: _allNews[allIndex].comments + 1,
+                                  );
+                                }
+
+                                final filteredIndex = _filtered.indexWhere((n) => n.id == _commentsTarget!.id);
+                                if (filteredIndex != -1) {
+                                  _filtered[filteredIndex] = _filtered[filteredIndex].copyWith(
+                                    comments: _filtered[filteredIndex].comments + 1,
+                                  );
+                                }
+
+                                // _commentsTarget을 다시 설정하여 모달 리빌드
+                                final currentTarget = _commentsTarget;
+                                _commentsTarget = null;
+                                Future.delayed(const Duration(milliseconds: 50), () {
+                                  if (mounted) {
+                                    setState(() {
+                                      _commentsTarget = currentTarget;
+                                    });
+                                  }
+                                });
+                              });
+                            },
+                          ),
+                        );
+                      },
                     ),
                 ],
               ),
@@ -683,40 +744,297 @@ class _ActionChipButton extends StatelessWidget {
   }
 }
 
-class CommentsModal extends StatelessWidget {
-  const CommentsModal({super.key, required this.isOpen, required this.onClose, required this.articleId, required this.articleTitle});
-  final bool isOpen;
-  final VoidCallback onClose;
-  final int articleId;
-  final String articleTitle;
+class _CommentInputBar extends StatefulWidget {
+  const _CommentInputBar({
+    required this.newsId,
+    required this.onCommentAdded,
+  });
+
+  final int newsId;
+  final VoidCallback onCommentAdded;
+
+  @override
+  State<_CommentInputBar> createState() => _CommentInputBarState();
+}
+
+class _CommentInputBarState extends State<_CommentInputBar> {
+  final TextEditingController _controller = TextEditingController();
+  final NewsListService _newsService = NewsListService();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_controller.text.trim().isEmpty || _isSubmitting) return;
+
+    final content = _controller.text.trim();
+    _controller.clear();
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await _newsService.addNewsComment(widget.newsId, content);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('댓글이 작성되었습니다'),
+            duration: Duration(milliseconds: 1500),
+            backgroundColor: Color(0xFF8B5CF6),
+          ),
+        );
+
+        // 댓글 목록 새로고침
+        widget.onCommentAdded();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('댓글 작성 실패: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        // 실패 시 입력 내용 복원
+        _controller.text = content;
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    if (!isOpen) return const SizedBox.shrink();
     return Container(
-      height: 340,
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -2))],
+        border: Border(top: BorderSide(color: Color(0xFFEEEEEE), width: 1)),
       ),
-      child: Column(
-        children: [
-          ListTile(
-            title: const Text('댓글', style: TextStyle(fontWeight: FontWeight.bold)),
-            subtitle: Text(articleTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
-            trailing: IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
-          ),
-          const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: const [
-                ListTile(leading: CircleAvatar(backgroundColor: Colors.grey, radius: 14, child: Icon(Icons.person, size: 16, color: Colors.white)), title: Text('뉴스리뷰', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)), subtitle: Text('좋은 기사네요 👍', style: TextStyle(fontSize: 13)), dense: true),
-              ],
+      child: Container(
+        margin: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF7F8FA),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _controller,
+                enabled: !_isSubmitting,
+                decoration: const InputDecoration(
+                  hintText: '댓글을 입력하세요...',
+                  hintStyle: TextStyle(color: Color(0xFF999999), fontSize: 14),
+                  border: InputBorder.none,
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+                ),
+                style: const TextStyle(fontSize: 14),
+                maxLines: null,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => _submit(),
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: _isSubmitting ? null : _submit,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: _isSubmitting
+                      ? null
+                      : const LinearGradient(
+                          colors: [Color(0xFF8B5CF6), Color(0xFFEC4899)],
+                        ),
+                  color: _isSubmitting ? Colors.grey : null,
+                  shape: BoxShape.circle,
+                ),
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(
+                        Icons.arrow_upward,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CommentsModal extends StatefulWidget {
+  const _CommentsModal({
+    required this.newsId,
+    required this.newsTitle,
+    required this.onClose,
+  });
+
+  final int newsId;
+  final String newsTitle;
+  final VoidCallback onClose;
+
+  @override
+  State<_CommentsModal> createState() => _CommentsModalState();
+}
+
+class _CommentsModalState extends State<_CommentsModal> {
+  final NewsListService _newsService = NewsListService();
+  List<Comment> _comments = [];
+  bool _isLoading = true;
+  String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadComments();
+  }
+
+  Future<void> _loadComments() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final response = await _newsService.getNewsComments(widget.newsId);
+      final data = response['data'] as List<dynamic>?;
+
+      if (data != null) {
+        setState(() {
+          _comments = data.map((e) => Comment.fromJson(e as Map<String, dynamic>)).toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _comments = [];
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = '댓글을 불러오는데 실패했습니다: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatTimestamp(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inMinutes < 1) return '방금 전';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}분 전';
+    if (diff.inHours < 24) return '${diff.inHours}시간 전';
+    if (diff.inDays < 7) return '${diff.inDays}일 전';
+    return '${dt.month}월 ${dt.day}일';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      ignoring: false,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, -2))],
+        ),
+        child: Column(
+          children: [
+            ListTile(
+              title: const Text('댓글', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(widget.newsTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12)),
+              trailing: IconButton(
+                onPressed: widget.onClose,
+                icon: const Icon(Icons.close),
+              ),
+            ),
+            const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadComments,
+                                child: const Text('다시 시도'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _comments.isEmpty
+                          ? const Center(
+                              child: Text(
+                                '첫 댓글을 작성해보세요!',
+                                style: TextStyle(color: Colors.grey),
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.only(bottom: 80), // 입력창 공간
+                              itemCount: _comments.length,
+                              itemBuilder: (context, index) {
+                                final comment = _comments[index];
+                                return ListTile(
+                                  leading: comment.user.profileImage != null && comment.user.profileImage!.isNotEmpty
+                                      ? CircleAvatar(
+                                          radius: 14,
+                                          backgroundImage: NetworkImage(comment.user.profileImage!),
+                                          backgroundColor: Colors.grey,
+                                        )
+                                      : const CircleAvatar(
+                                          backgroundColor: Colors.grey,
+                                          radius: 14,
+                                          child: Icon(Icons.person, size: 16, color: Colors.white),
+                                        ),
+                                  title: Row(
+                                    children: [
+                                      Text(
+                                        comment.user.nickname,
+                                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        '· ${_formatTimestamp(comment.createdAt)}',
+                                        style: const TextStyle(fontSize: 11, color: Colors.grey),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Text(comment.content, style: const TextStyle(fontSize: 13)),
+                                  dense: true,
+                                );
+                              },
+                            ),
+            ),
+          ],
+        ),
       ),
     );
   }
