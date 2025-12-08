@@ -12,6 +12,9 @@ import '../../models/profile_lists.dart';
 // [수정] 방금 만드신 ProfileService import (파일 경로가 다르면 수정해주세요)
 import '../../services/profile_service.dart';
 
+import '../home_screen.dart'; // profileUpdateNotifier 사용
+import 'profile_setup_screen.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -71,11 +74,43 @@ class _ProfileScreenState extends State<ProfileScreen>
   // [수정] API를 통해 프로필 정보를 가져오는 함수
   Future<void> _loadProfileData() async {
     try {
-      // API 호출
+      // 1. API 호출
       final data = await _profileService.getMyProfile();
 
       print('📌 [DEBUG] 서버에서 받은 프로필 데이터 전체: $data');
-      print('📌 [DEBUG] 닉네임 값 확인: ${data['user']['nickname']}');
+
+      // 2. 데이터 구조 분리
+      final userMap = data['user'] ?? {};
+      final statsMap = data['stats'] ?? {};
+
+      // ============================================================
+      // [추가된 로직] 닉네임이 없으면 프로필 설정 화면으로 이동
+      // ============================================================
+      final serverNickname = userMap['nickname'] as String?;
+
+      // 닉네임이 null이거나 비어있다면
+      if (serverNickname == null || serverNickname.trim().isEmpty) {
+        print('⚠️ 닉네임 없음 감지 -> 프로필 설정 화면으로 이동');
+
+        if (!mounted) return; // 화면이 살아있는지 확인
+
+        // 프로필 설정 화면으로 이동 (결과를 기다림)
+        final result = await Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
+        );
+
+        // 설정이 완료되어 true가 반환되면, 다시 프로필 데이터를 불러옵니다.
+        if (result == true) {
+          print('✅ 프로필 설정 완료 -> 데이터 재로딩');
+          // 프로필 변경 알림 (필요시)
+          // profileUpdateNotifier.value++;
+
+          // 재귀적으로 함수를 다시 호출하여 데이터를 새로고침하고 종료
+          _loadProfileData();
+          return;
+        }
+      }
+      // ============================================================
 
       // [추가] 게시글 목록 조회 (최근 5개만)
       final postData = await _profileService.getMyPosts(page: 1, size: 5);
@@ -86,13 +121,10 @@ class _ProfileScreenState extends State<ProfileScreen>
       if (!mounted) return;
 
       setState(() {
-        // 1. 닉네임
-        // 'user' 객체와 'stats' 객체를 먼저 분리해서 꺼냅니다.
-        final userMap = data['user'] ?? {};
-        final statsMap = data['stats'] ?? {};
-        name = userMap['nickname'] ?? '알 수 없음';
+        // 1. 닉네임 (위에서 검사했지만, 화면 표시용 변수에 할당)
+        name = serverNickname ?? '알 수 없음';
 
-        // 2. 프로필 이미지 (userMap에서 꺼내기)
+        // 2. 프로필 이미지
         final serverImage = userMap['profile_image'];
         if (serverImage != null && serverImage.toString().isNotEmpty) {
           avatarUrl = serverImage;
@@ -100,35 +132,30 @@ class _ProfileScreenState extends State<ProfileScreen>
           avatarUrl = defaultAvatar;
         }
 
-        // 3. 통계 (statsMap에서 꺼내기 & 키 이름 스네이크 케이스로 수정)
-        // 로그: post_count, comment_count, total_received_likes
+        // 3. 통계
         posts = statsMap['post_count'] ?? 0;
         comments = statsMap['comment_count'] ?? 0;
-        likes = statsMap['total_received_likes'] ?? 0; // likeCount -> total_received_likes 확인
+        likes = statsMap['total_received_likes'] ?? 0;
 
-        // 나머지는 그대로
+        // 4. 자기소개
         bio = userMap['bio'] ?? data['bio'] ?? '아직 자기소개가 없습니다.';
         _bioController.text = bio;
 
-        // [추가] 받아온 게시글 리스트 저장
+        // 5. 게시글 및 댓글 리스트
         _myPosts = postData.posts;
-
-        // [추가] 댓글 리스트 저장
         _myComments = commentData.comments;
 
-        _isLoading = false;
+        _isLoading = false; // 로딩 종료
       });
     } catch (e) {
       debugPrint('❌ 프로필 로딩 에러: $e');
       if (!mounted) return;
       setState(() {
         _isLoading = false;
-        // 에러 발생 시 기본값 유지
         name = '오류 발생';
         bio = '정보를 불러오지 못했습니다.';
         avatarUrl = defaultAvatar;
       });
-      // 에러 메시지 띄우기
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('프로필 로딩 실패: $e')),
       );
@@ -601,7 +628,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     '내가 쓴 글',
                                     style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                                   ),
-                                  // 🔽 [추가] 게시글 개수 뱃지
                                   const SizedBox(width: 8),
                                   Container(
                                     padding:
@@ -614,7 +640,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       borderRadius: BorderRadius.circular(999),
                                     ),
                                     child: Text(
-                                      '$posts', // 실제 게시글 개수 변수
+                                      '$posts',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: Theme.of(context).colorScheme.primary,
@@ -630,6 +656,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                             Padding(
                               padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
                               child: _myPosts.isEmpty
+                              // [기준] 게시글 없을 때 (이 스타일로 통일)
                                   ? const Padding(
                                 padding: EdgeInsets.symmetric(vertical: 20.0),
                                 child: Center(
@@ -640,7 +667,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 ),
                               )
                                   : Container(
-                                //height: _myPosts.length > 3 ? 240 : null,
                                 height: 220,
                                 child: Scrollbar(
                                   thumbVisibility: true,
@@ -741,13 +767,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                                             post.postId.toString());
                                                       }
                                                     },
-                                                    itemBuilder: (BuildContext context) =>
-                                                    [
+                                                    itemBuilder:
+                                                        (BuildContext context) => [
                                                       const PopupMenuItem<String>(
                                                         value: 'delete',
                                                         child: Text('게시글 삭제',
-                                                            style:
-                                                            TextStyle(fontSize: 13)),
+                                                            style: TextStyle(
+                                                                fontSize: 13)),
                                                       ),
                                                     ],
                                                   ),
@@ -776,7 +802,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             InkWell(
-                              // onTap: () {print('댓글 전체보기 클릭됨');},
                               borderRadius:
                               const BorderRadius.vertical(top: Radius.circular(24)),
                               child: Padding(
@@ -816,7 +841,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         ),
                                       ],
                                     ),
-                                    // Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade500),
                                   ],
                                 ),
                               ),
@@ -826,7 +850,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                               padding: const EdgeInsets.fromLTRB(16, 24, 16, 16),
                               child: _myComments.isNotEmpty
                                   ? Container(
-                                //height: _myComments.length > 3 ? 240 : null,
                                 height: 220,
                                 child: Scrollbar(
                                   thumbVisibility: true,
@@ -903,7 +926,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                                                   child: Text(
                                                                     comment.targetTitle,
                                                                     maxLines: 1,
-                                                                    overflow: TextOverflow
+                                                                    overflow:
+                                                                    TextOverflow
                                                                         .ellipsis,
                                                                     style: TextStyle(
                                                                       fontSize: 12,
@@ -938,18 +962,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   ),
                                 ),
                               )
-                                  : Column(
-                                children: [
-                                  const SizedBox(height: 12),
-                                  const SizedBox(height: 8),
-                                  Text(
+                              // [수정] 댓글 없을 때 스타일을 '게시글 없음'과 동일하게 변경
+                                  : const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 20.0),
+                                child: Center(
+                                  child: Text(
                                     '작성한 댓글이 없습니다.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.grey.shade600,
-                                    ),
+                                    style: TextStyle(fontSize: 13, color: Colors.grey),
                                   ),
-                                ],
+                                ),
                               ),
                             ),
                           ],
