@@ -244,21 +244,19 @@ class _HeaderState extends State<_Header> {
         String displayNickname = '안녕하세요 👋';
         String? profileImageUrl;
 
-        // --- 2. 데이터 파싱 로직 (profile_screen.dart 참고) ---
+        // --- 2. 데이터 파싱 로직 (API 응답 구조: { user: {...}, stats: {...} }) ---
         if (snapshot.hasData && snapshot.data != null) {
-          final rootData = snapshot.data!;
+          final data = snapshot.data!;
+          final userMap = data['user'] as Map<String, dynamic>?;
 
-          // 🔥 핵심 수정: 'user' 객체 먼저 추출
-          final userMap = rootData['user'];
-
-          if (userMap is Map<String, dynamic>) {
+          if (userMap != null) {
             // 닉네임 설정
             final nickname = userMap['nickname'];
             if (nickname != null) {
               displayNickname = '$nickname님 👋';
             }
 
-            // 프로필 이미지 설정 (profile_image 키 사용)
+            // 프로필 이미지 설정
             final serverImage = userMap['profile_image'];
             if (serverImage != null && serverImage.toString().isNotEmpty) {
               profileImageUrl = serverImage.toString();
