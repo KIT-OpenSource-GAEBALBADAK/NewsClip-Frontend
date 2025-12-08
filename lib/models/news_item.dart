@@ -51,9 +51,10 @@ class NewsItem {
       source: json['source'] ?? '',
       content: json['content'] ?? '',
       url: json['url'] ?? '',
-      isBookmarked: json['isBookmarked'] ?? false,
-      isLiked: json['isLiked'] ?? false,
-      isDisliked: json['isDisliked'] ?? false,
+      // 🔥 snake_case와 camelCase 둘 다 지원 (API 응답 형식에 유연하게 대응)
+      isBookmarked: json['is_bookmarked'] as bool? ?? json['isBookmarked'] as bool? ?? false,
+      isLiked: json['is_liked'] as bool? ?? json['isLiked'] as bool? ?? false,
+      isDisliked: json['is_disliked'] as bool? ?? json['isDisliked'] as bool? ?? false,
     );
   }
 

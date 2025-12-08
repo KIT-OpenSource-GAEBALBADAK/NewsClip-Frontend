@@ -59,9 +59,10 @@ class _BookmarkedNewsScreenState extends State<BookmarksScreen> {
           likes: item.likeCount,
           comments: item.commentCount,
           url: '',
-          isBookmarked: true,
-          isLiked: false,
-          isDisliked: false,
+          // 🔥 서버에서 받은 실제 값 사용
+          isBookmarked: item.isBookmarked,
+          isLiked: item.isLiked,
+          isDisliked: item.isDisliked,
         );
       }).toList();
 

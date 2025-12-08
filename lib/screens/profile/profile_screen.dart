@@ -52,8 +52,8 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool isExpert = false;
   String joinDate = '';
 
-  int posts = 0;
-  int comments = 0;
+  int postsCount = 0;
+  int commentsCount = 0;
   int likes = 0;
   int followers = 0;
 
@@ -75,25 +75,59 @@ class _ProfileScreenState extends State<ProfileScreen>
   // [수정] API를 통해 프로필 정보를 가져오는 함수
   Future<void> _loadProfileData() async {
     try {
-      // 1. API 호출
+      // 🔥 1. 캐시된 프로필이 있으면 우선 사용 (빠른 UI 업데이트)
+      if (ProfileCache.hasValidCache) {
+        final cachedData = ProfileCache.getCache()!;
+        final userMap = cachedData['user'] ?? {};
+        final statsMap = cachedData['stats'] ?? {};
+
+        // 캐시된 데이터로 먼저 UI 업데이트
+        setState(() {
+          name = userMap['nickname'] ?? '알 수 없음';
+
+          final serverImage = userMap['profile_image'];
+          if (serverImage != null && serverImage.toString().isNotEmpty) {
+            avatarUrl = serverImage;
+          } else {
+            avatarUrl = defaultAvatar;
+          }
+
+          postsCount = statsMap['post_count'] ?? 0;
+          commentsCount = statsMap['comment_count'] ?? 0;
+          likes = statsMap['total_received_likes'] ?? 0;
+
+          bio = userMap['bio'] ?? '아직 자기소개가 없습니다.';
+          _bioController.text = bio;
+        });
+
+        debugPrint('✅ 캐시된 프로필로 빠른 UI 업데이트 완료');
+      }
+
+      // 2. API 호출로 최신 데이터 가져오기
       final data = await _profileService.getMyProfile();
+
+      // 🔥 캐시 업데이트
+      ProfileCache.setCache(data);
 
       print('📌 [DEBUG] 서버에서 받은 프로필 데이터 전체: $data');
 
-      // 2. 데이터 구조 분리
-      final userMap = data['user'] ?? {};
-      final statsMap = data['stats'] ?? {};
+      // 3. 데이터 구조 분리
+      final apiUserMap = data['user'] ?? {};
+      final apiStatsMap = data['stats'] ?? {};
 
       // ============================================================
-      // [추가된 로직] 닉네임이 없으면 프로필 설정 화면으로 이동
+      // [유지] 닉네임이 없으면 프로필 설정 화면으로 이동
       // ============================================================
-      final serverNickname = userMap['nickname'] as String?;
+      final serverNickname = apiUserMap['nickname'] as String?;
 
       // 닉네임이 null이거나 비어있다면
       if (serverNickname == null || serverNickname.trim().isEmpty) {
         print('⚠️ 닉네임 없음 감지 -> 프로필 설정 화면으로 이동');
 
         if (!mounted) return;
+
+        // 🔥 캐시 클리어
+        ProfileCache.clearCache();
 
         // 프로필 설정 화면으로 이동 (결과를 기다림)
         final result = await Navigator.of(context).push(
@@ -110,11 +144,9 @@ class _ProfileScreenState extends State<ProfileScreen>
       }
       // ============================================================
 
-      // [추가] 게시글 목록 조회 (최근 5개만)
-      final postData = await _profileService.getMyPosts(page: 1, size: 5);
-
-      // [추가] 댓글 목록 조회 (최근 5개)
-      final commentData = await _profileService.getMyComments(page: 1, size: 5);
+      // 4. 게시글, 댓글 데이터는 병렬로 조회 (명시적 타입 지정)
+      final MyPostList postData = await _profileService.getMyPosts(page: 1, size: 5);
+      final MyCommentList commentData = await _profileService.getMyComments(page: 1, size: 5);
 
       if (!mounted) return;
 
@@ -123,7 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen>
         name = serverNickname ?? '알 수 없음';
 
         // 2. 프로필 이미지
-        final serverImage = userMap['profile_image'];
+        final serverImage = apiUserMap['profile_image'];
         if (serverImage != null && serverImage.toString().isNotEmpty) {
           avatarUrl = serverImage;
         } else {
@@ -131,12 +163,12 @@ class _ProfileScreenState extends State<ProfileScreen>
         }
 
         // 3. 통계
-        posts = statsMap['post_count'] ?? 0;
-        comments = statsMap['comment_count'] ?? 0;
-        likes = statsMap['total_received_likes'] ?? 0;
+        postsCount = apiStatsMap['post_count'] ?? 0;
+        commentsCount = apiStatsMap['comment_count'] ?? 0;
+        likes = apiStatsMap['total_received_likes'] ?? 0;
 
         // 4. 자기소개
-        bio = userMap['bio'] ?? data['bio'] ?? '아직 자기소개가 없습니다.';
+        bio = apiUserMap['bio'] ?? data['bio'] ?? '아직 자기소개가 없습니다.';
         _bioController.text = bio;
 
         // 5. 게시글 및 댓글 리스트
@@ -542,13 +574,13 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   _StatCard(
                                     icon: Icons.chat_bubble_outline,
                                     label: '작성글',
-                                    value: posts,
+                                    value: postsCount,
                                     color: Colors.blue,
                                   ),
                                   _StatCard(
                                     icon: Icons.mode_comment_outlined,
                                     label: '댓글',
-                                    value: comments,
+                                    value: commentsCount,
                                     color: Colors.green,
                                   ),
                                   _StatCard(
@@ -614,7 +646,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       borderRadius: BorderRadius.circular(999),
                                     ),
                                     child: Text(
-                                      '$posts',
+                                      '$postsCount',
                                       style: TextStyle(
                                         fontSize: 11,
                                         color: Theme.of(context)
@@ -856,7 +888,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                             BorderRadius.circular(999),
                                           ),
                                           child: Text(
-                                            '$comments',
+                                            '$commentsCount',
                                             style: TextStyle(
                                               fontSize: 11,
                                               color: Theme.of(context)

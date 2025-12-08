@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../services/profile_service.dart';
+import '../home_screen.dart'; // ProfileCache 사용
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -62,6 +63,12 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       );
 
       if (!mounted) return;
+
+      // 🔥 프로필 캐시 무효화 (새로운 데이터를 다시 불러오도록)
+      ProfileCache.clearCache();
+
+      // 🔥 전역 프로필 업데이트 알림
+      profileUpdateNotifier.value++;
 
       // 성공 메시지 표시
       final message = result['message'] ?? '프로필 설정이 완료되었습니다.';

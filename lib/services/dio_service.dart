@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
@@ -16,6 +17,10 @@ class DioService {
   // 토큰 키 상수화
   static const String _accessTokenKey = 'access_token';
   static const String _refreshTokenKey = 'refresh_token';
+
+  // 🔥 토큰 재발급 중복 방지를 위한 플래그
+  bool _isRefreshing = false;
+  final List<void Function(String)> _refreshCallbacks = [];
 
   /// 싱글톤 팩토리 생성자
   factory DioService() => _instance;
@@ -53,8 +58,40 @@ class DioService {
             return handler.next(error);
           }
 
+          // 🔥 이미 토큰 재발급 중이라면 대기
+          if (_isRefreshing) {
+            print('⏸️ 토큰 재발급 중... 대기열에 추가');
+
+            // 재발급 완료를 기다렸다가 새로운 토큰으로 요청 재시도
+            String? newToken;
+            await Future.delayed(Duration.zero, () async {
+              // 콜백 등록 방식으로 대기
+              final completer = Completer<String>();
+              _refreshCallbacks.add((token) => completer.complete(token));
+              newToken = await completer.future;
+            });
+
+            if (newToken != null) {
+              // 원래 요청을 새 토큰으로 재시도
+              final originalRequestOptions = error.requestOptions;
+              originalRequestOptions.headers['Authorization'] = 'Bearer $newToken';
+
+              print('🔄 대기 완료. 새로운 토큰으로 원래 요청을 재시도합니다: ${originalRequestOptions.path}');
+              try {
+                final retryResponse = await _dio.fetch(originalRequestOptions);
+                return handler.resolve(retryResponse);
+              } catch (e) {
+                return handler.next(error);
+              }
+            }
+            return handler.next(error);
+          }
+
+          // 🔥 토큰 재발급 시작
+          _isRefreshing = true;
+
           try {
-            // 토큰 재발급 요청 (새로운 Dio 인스턴스 사용 방지 - 현재 _dio 사용)
+            // 토큰 재발급 요청
             final refreshResponse = await _dio.post(
               '/auth/refresh',
               data: {'refreshToken': refreshToken},
@@ -66,6 +103,13 @@ class DioService {
               await _saveAccessToken(newAccessToken);
               print('✅ 토큰 재발급 성공.');
 
+              // 🔥 대기 중인 모든 요청에 새 토큰 전달
+              for (var callback in _refreshCallbacks) {
+                callback(newAccessToken);
+              }
+              _refreshCallbacks.clear();
+              _isRefreshing = false;
+
               // 실패했던 원래 요청의 헤더를 새로운 토큰으로 업데이트
               final originalRequestOptions = error.requestOptions;
               originalRequestOptions.headers['Authorization'] = 'Bearer $newAccessToken';
@@ -76,12 +120,16 @@ class DioService {
               return handler.resolve(retryResponse);
             } else {
               // 재발급은 성공했으나 응답 형식이 예상과 다를 경우
+              _isRefreshing = false;
+              _refreshCallbacks.clear();
               await logout();
               _navigateToLogin();
               return handler.next(error);
             }
           } on DioException catch (_) {
              print('❌ 토큰 재발급 실패. 사용자를 로그아웃 처리합니다.');
+             _isRefreshing = false;
+             _refreshCallbacks.clear();
              await logout();
              _navigateToLogin();
              return handler.next(error);

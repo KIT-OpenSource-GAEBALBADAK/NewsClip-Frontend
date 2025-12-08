@@ -53,6 +53,17 @@ class _NewsReaderScreenState extends State<NewsReaderScreen> {
         final list = data.map((e) => NewsCard.fromJson(e as Map<String, dynamic>)).toList();
         setState(() {
           articles.addAll(list);
+          // 🔥 초기 상태 반영
+          for (var card in list) {
+            if (card.isLiked) {
+              liked.add(card.shortId);
+              debugPrint('  ✅ 쇼츠 좋아요 표시: [${card.shortId}] ${card.title}');
+            }
+            if (card.isDisliked) {
+              disliked.add(card.shortId);
+              debugPrint('  ❌ 쇼츠 싫어요 표시: [${card.shortId}] ${card.title}');
+            }
+          }
         });
       } else {
         setState(() {

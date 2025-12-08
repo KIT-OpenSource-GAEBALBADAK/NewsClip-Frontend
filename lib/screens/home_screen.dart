@@ -11,6 +11,30 @@ import '../widgets/common/bottom_navigation.dart';
 // 프로필 변경을 알리기 위한 전역 notifier
 final ValueNotifier<int> profileUpdateNotifier = ValueNotifier<int>(0);
 
+// 🔥 프로필 데이터 전역 캐시 (중복 호출 방지)
+class ProfileCache {
+  static Map<String, dynamic>? _cachedProfile;
+  static DateTime? _lastFetch;
+  static const Duration _cacheTimeout = Duration(minutes: 5);
+
+  static bool get hasValidCache {
+    if (_cachedProfile == null || _lastFetch == null) return false;
+    return DateTime.now().difference(_lastFetch!) < _cacheTimeout;
+  }
+
+  static void setCache(Map<String, dynamic> profile) {
+    _cachedProfile = profile;
+    _lastFetch = DateTime.now();
+  }
+
+  static Map<String, dynamic>? getCache() => _cachedProfile;
+
+  static void clearCache() {
+    _cachedProfile = null;
+    _lastFetch = null;
+  }
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
 

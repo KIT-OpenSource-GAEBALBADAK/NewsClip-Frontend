@@ -61,6 +61,8 @@ class BookmarkedNewsItem {
   final int dislikeCount;
   final int commentCount;
   final bool isBookmarked;
+  final bool isLiked;
+  final bool isDisliked;
 
   BookmarkedNewsItem({
     required this.newsId,
@@ -76,6 +78,8 @@ class BookmarkedNewsItem {
     required this.dislikeCount,
     required this.commentCount,
     required this.isBookmarked,
+    required this.isLiked,
+    required this.isDisliked,
   });
 
   factory BookmarkedNewsItem.fromJson(Map<String, dynamic> json) {
@@ -95,7 +99,10 @@ class BookmarkedNewsItem {
       likeCount: json['like_count'] ?? 0,
       dislikeCount: json['dislike_count'] ?? 0,
       commentCount: json['comment_count'] ?? 0,
-      isBookmarked: json['is_bookmarked'] ?? false,
+      // 🔥 snake_case와 camelCase 둘 다 지원
+      isBookmarked: json['is_bookmarked'] as bool? ?? json['isBookmarked'] as bool? ?? false,
+      isLiked: json['is_liked'] as bool? ?? json['isLiked'] as bool? ?? false,
+      isDisliked: json['is_disliked'] as bool? ?? json['isDisliked'] as bool? ?? false,
     );
   }
 }
