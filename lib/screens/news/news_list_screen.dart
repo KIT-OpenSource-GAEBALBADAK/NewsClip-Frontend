@@ -83,14 +83,22 @@ class _NewsListScreenState extends State<NewsListScreen> {
 
   Future<void> _loadProfile() async {
     try {
-      final response = await _profileService.getMyProfile();
-      final data = response['data'];
+      debugPrint('🔵 NewsListScreen: 프로필 로드 시작');
+      final data = await _profileService.getMyProfile();
+      debugPrint('🔵 NewsListScreen: 프로필 응답 받음 - $data');
+
+      // API 응답 구조: { user: {...}, stats: {...} }
+      final userMap = data['user'] as Map<String, dynamic>?;
+
       setState(() {
-        _userProfileImage = data['profile_image'] as String?;
-        _userName = data['nickname'] as String?;
+        _userProfileImage = userMap?['profile_image'] as String?;
+        _userName = userMap?['nickname'] as String?;
+        debugPrint('🔵 NewsListScreen: 프로필 상태 업데이트 완료');
+        debugPrint('   - 이름: $_userName');
+        debugPrint('   - 이미지 URL: $_userProfileImage');
       });
     } catch (e) {
-      debugPrint('프로필 로드 실패: $e');
+      debugPrint('❌ NewsListScreen: 프로필 로드 실패: $e');
       // 실패해도 기본 이미지로 표시되므로 에러 무시
     }
   }
@@ -435,6 +443,8 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🔵 _Header 빌드: profileImage=$profileImage, userName=$userName');
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
@@ -445,8 +455,8 @@ class _Header extends StatelessWidget {
                   radius: 20,
                   backgroundImage: NetworkImage(profileImage!),
                   backgroundColor: Colors.grey,
-                  onBackgroundImageError: (_, __) {
-                    // 이미지 로드 실패 시 처리
+                  onBackgroundImageError: (exception, stackTrace) {
+                    debugPrint('❌ 프로필 이미지 로드 실패: $exception');
                   },
                 )
               : const CircleAvatar(
