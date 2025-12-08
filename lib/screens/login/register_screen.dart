@@ -1,6 +1,8 @@
+import 'dart:async'; // Timer 사용을 위해 추가
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+// 아래 import 경로들은 프로젝트 상황에 맞게 유지해주세요.
 import '../../core/utils/validators.dart';
 import '../../services/user_service.dart';
 import 'email_login_screen.dart';
@@ -13,12 +15,23 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  // Colors
-  static const Color _purple = Color(0xFF8B5CF6);
-  static const Color _pink = Color(0xFFEC4899);
+  // ===== Design Token Colors =====
+  static const Color _gradientStart = Color(0xFFCC6FF3);
+  static const Color _gradientEnd = Color(0xFFFF8ACB);
+  static const Color _primarySolid = Color(0xFFB95AED);
+  static const Color _success = Color(0xFF22C55E);
+  static const Color _error = Color(0xFFEF4444);
+  static const Color _textPrimary = Color(0xFF111827);
+  static const Color _textPlaceholder = Color(0xFFA0A4B8);
+  static const Color _borderDefault = Color(0xFFE5E7EB);
+  static const Color _borderFocus = Color(0xFFCC6FF3);
+  static const Color _borderSuccess = Color(0xFF22C55E);
+  static const Color _bgInput = Color(0xFFF9FAFB);
+  static const Color _toastBg = Color(0xFF111827);
 
   // Controllers
-  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
+  final _verificationCodeCtrl = TextEditingController();
   final _pwCtrl = TextEditingController();
   final _pwConfirmCtrl = TextEditingController();
 
@@ -27,10 +40,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscure = true;
   bool _obscureConfirm = true;
 
-  // 이메일 중복확인 관련 상태
-  bool _isCheckingEmail = false;
-  bool _isEmailAvailable = false;
-  String? _checkedEmail;
+  // 이메일 인증 상태
+  bool _isSendingCode = false;
+  bool _isVerifyingCode = false;
+  bool _isEmailVerified = false;
+  bool _showVerificationField = false;
+  int _remainingSeconds = 0;
+  int _resendCooldown = 0; // 재전송 쿨다운 (60초)
+  String? _verificationToken;
+  Timer? _resendTimer;
 
   // 약관 동의 상태
   bool _agreeTerms = false;
@@ -40,7 +58,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   // 서비스 인스턴스
   late final UserService _userService;
 
-
   @override
   void initState() {
     super.initState();
@@ -49,7 +66,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
-    _usernameCtrl.dispose();
+    _resendTimer?.cancel();
+    _emailCtrl.dispose();
+    _verificationCodeCtrl.dispose();
     _pwCtrl.dispose();
     _pwConfirmCtrl.dispose();
     super.dispose();
@@ -58,12 +77,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool get _allRequired => _agreeTerms && _agreePrivacy;
 
   bool get _canSubmit =>
-      _usernameCtrl.text.trim().isNotEmpty &&
-      _pwCtrl.text.isNotEmpty &&
-      _pwConfirmCtrl.text.isNotEmpty &&
-      _pwCtrl.text == _pwConfirmCtrl.text &&
-      _allRequired &&
-      _isEmailAvailable;
+      _emailCtrl.text.trim().isNotEmpty &&
+          _pwCtrl.text.isNotEmpty &&
+          _pwConfirmCtrl.text.isNotEmpty &&
+          _pwCtrl.text == _pwConfirmCtrl.text &&
+          _allRequired &&
+          _isEmailVerified;
 
   void _toggleAgreeAll() {
     final newVal = !(_agreeTerms && _agreePrivacy && _agreeMarketing);
@@ -78,80 +97,189 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg),
+        content: Text(
+          msg,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+            color: Colors.white,
+          ),
+        ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: success ? Colors.green.shade600 : Colors.black87,
+        backgroundColor: success ? _success : _toastBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        margin: const EdgeInsets.only(bottom: 76, left: 20, right: 20),
       ),
     );
   }
 
   static OutlineInputBorder _outline(Color c) => OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: c, width: 1.15),
-      );
+    borderRadius: BorderRadius.circular(12),
+    borderSide: BorderSide(color: c, width: 1.15),
+  );
 
-  // ✅ 이메일 중복확인
-  Future<void> _checkEmailDuplicate() async {
-    final email = _usernameCtrl.text.trim();
+  // 이메일 인증번호 발송
+  // 이메일 인증번호 발송 (중복확인 포함)
+  Future<void> _sendVerificationCode() async {
+    final email = _emailCtrl.text.trim();
 
-    // ✅ 1단계: 이메일 형식 검증
+    // 이메일 형식 검증
     final emailError = validateEmail(email);
     if (emailError != null) {
       _toast(emailError);
       return;
     }
 
-    // ✅ 2단계: 형식이 올바르면 중복확인 진행
-    setState(() => _isCheckingEmail = true);
+    setState(() => _isSendingCode = true);
 
     try {
+      // ✅ 1단계: 이메일 중복확인 (checkUsername API 호출)
+      debugPrint('🔵 Step 1: 이메일 중복확인 시작');
       final isAvailable = await _userService.checkUsername(username: email);
 
       if (!mounted) return;
 
+      if (!isAvailable) {
+        // 중복된 이메일
+        _toast('이미 사용 중인 이메일입니다');
+        return;
+      }
+
+      debugPrint('✅ Step 1: 이메일 사용 가능 확인됨');
+
+      // ✅ 2단계: 인증번호 발송 (sendVerificationCode API 호출)
+      debugPrint('🔵 Step 2: 인증번호 발송 시작');
+      final response = await _userService.sendVerificationCode(
+        email: email,
+        type: 'signup',
+      );
+
+      if (!mounted) return;
+
+      // 응답에서 유효시간 추출
+      final expirationTime = response['data']?['expiration_time'] ?? 180;
+
       setState(() {
-        _isEmailAvailable = isAvailable;
-        _checkedEmail = email;
+        _showVerificationField = true;
+        _remainingSeconds = expirationTime;
       });
 
-      _toast(
-        isAvailable ? '사용 가능한 이메일입니다' : '이미 사용 중인 이메일입니다',
-        success: isAvailable,
-      );
+      _startTimer();
+      _startResendCooldown(); // 재전송 쿨다운 시작 (1분)
+      _toast('인증번호가 발송되었습니다', success: true);
+
+      debugPrint('✅ Step 2: 인증번호 발송 완료 (유효시간: ${expirationTime}초)');
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _isEmailAvailable = false;
-        _checkedEmail = null;
-      });
-      _toast('중복확인 실패: $e');
+      debugPrint('❌ 인증번호 발송 실패: $e');
+      _toast('$e');
     } finally {
-      if (mounted) setState(() => _isCheckingEmail = false);
+      if (mounted) setState(() => _isSendingCode = false);
+    }
+  }
+
+  // 타이머 시작
+  void _startTimer() {
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return false;
+
+      setState(() {
+        if (_remainingSeconds > 0) {
+          _remainingSeconds--;
+        }
+      });
+
+      return _remainingSeconds > 0 &&
+          _showVerificationField &&
+          !_isEmailVerified;
+    });
+  }
+
+  // 재전송 쿨다운 타이머 시작 (1분)
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    setState(() => _resendCooldown = 60); // 1분 = 60초
+
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        if (_resendCooldown > 0) {
+          _resendCooldown--;
+        } else {
+          timer.cancel();
+        }
+      });
+    });
+  }
+
+  // 인증번호 확인
+  Future<void> _verifyCode() async {
+    final email = _emailCtrl.text.trim();
+    final code = _verificationCodeCtrl.text.trim();
+
+    if (code.isEmpty) {
+      _toast('인증번호를 입력해주세요');
+      return;
+    }
+
+    setState(() => _isVerifyingCode = true);
+
+    try {
+      // ✅ 인증번호 검증 API 호출
+      debugPrint('🔵 인증번호 검증 시작');
+      final response = await _userService.verifyCode(
+        email: email,
+        code: code,
+        type: 'signup',
+      );
+
+      if (!mounted) return;
+
+      // 응답에서 인증 성공 여부 확인
+      final isVerified = response['data']?['is_verified'] ?? false;
+
+      if (isVerified) {
+        setState(() {
+          _isEmailVerified = true;
+          _showVerificationField = false;
+          _remainingSeconds = 0;
+        });
+        _toast('이메일 인증이 완료되었습니다', success: true);
+        debugPrint('✅ 이메일 인증 완료');
+      } else {
+        _toast('인증번호가 일치하지 않습니다');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      debugPrint('❌ 인증번호 검증 실패: $e');
+      _toast('$e');
+    } finally {
+      if (mounted) setState(() => _isVerifyingCode = false);
     }
   }
 
   Future<void> _submit() async {
-    // ✅ 비밀번호 검증
     final pwError = validatePassword(_pwCtrl.text);
     if (pwError != null) {
       _toast(pwError);
       return;
     }
 
-    // ✅ 비밀번호 확인 검증
     if (_pwCtrl.text != _pwConfirmCtrl.text) {
       _toast('비밀번호가 일치하지 않습니다');
       return;
     }
 
-    // ✅ 이메일 중복확인 검증
-    final currentEmail = _usernameCtrl.text.trim();
-    if (_checkedEmail != currentEmail || !_isEmailAvailable) {
-      _toast('이메일 중복확인을 해주세요');
+    if (!_isEmailVerified) {
+      _toast('이메일 인증을 완료해주세요');
       return;
     }
 
-    // ✅ 약관 동의 검증
     if (!_allRequired) {
       _toast('필수 약관에 동의해주세요');
       return;
@@ -160,10 +288,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _loading = true);
 
     try {
-      final username = _usernameCtrl.text.trim();
+      final username = _emailCtrl.text.trim();
       final password = _pwCtrl.text;
 
-      // ✅ 회원가입 API 호출
       final result = await _userService.register(
         username: username,
         password: password,
@@ -171,11 +298,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (!mounted) return;
 
-      // ✅ 회원가입 성공 메시지 표시
       final message = result['message'] ?? '회원가입이 완료되었습니다. 로그인해주세요.';
       _toast(message, success: true);
 
-      // ✅ 이메일 로그인 화면으로 이동
       await Future.delayed(const Duration(milliseconds: 500));
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
@@ -219,7 +344,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       gradient: const LinearGradient(
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
-                        colors: [_purple, _pink],
+                        colors: [_gradientStart, _gradientEnd],
                       ),
                       borderRadius: BorderRadius.circular(999),
                     ),
@@ -264,142 +389,249 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ),
 
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 24),
 
                       // 이메일
                       const _FieldLabel('이메일'),
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Expanded(
-                            child: Stack(
-                              alignment: Alignment.centerRight,
-                              children: [
-                                TextField(
-                                  controller: _usernameCtrl,
-                                  onChanged: (_) {
-                                    if (_isEmailAvailable) {
-                                      setState(() => _isEmailAvailable = false);
-                                    } else {
-                                      setState(() {});
-                                    }
-                                  },
-                                  keyboardType: TextInputType.emailAddress,
-                                  autofillHints: const <String>[],
-                                  enableSuggestions: false,
-                                  autocorrect: false,
-                                  decoration: InputDecoration(
-                                    hintText: 'example@email.com',
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 14),
-                                    filled: true,
-                                    fillColor: const Color(0xFFF8F7FF),
-                                    border: _outline(Colors.grey.shade300),
-                                    enabledBorder: _outline(
-                                      _isEmailAvailable
-                                          ? Colors.green
-                                          : Colors.grey.shade300,
-                                    ),
-                                    focusedBorder: _outline(
-                                      _isEmailAvailable ? Colors.green : _purple,
-                                    ),
-                                  ),
+                            child: TextField(
+                              controller: _emailCtrl,
+                              // 인증번호 발송 후 또는 인증 완료 시 수정 불가
+                              enabled: !_showVerificationField && !_isEmailVerified,
+                              onChanged: (_) {
+                                setState(() {});
+                              },
+                              keyboardType: TextInputType.emailAddress,
+                              autofillHints: const <String>[],
+                              enableSuggestions: false,
+                              autocorrect: false,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: _textPrimary,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'example@email.com',
+                                hintStyle: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w400,
+                                  color: _textPlaceholder,
                                 ),
-                                if (_isEmailAvailable)
-                                  Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                                    child: Container(
-                                      width: 24,
-                                      height: 24,
-                                      decoration: const BoxDecoration(
-                                        color: Colors.green,
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: const Icon(Icons.check,
-                                          size: 16, color: Colors.white),
-                                    ),
-                                  ),
-                              ],
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 16),
+                                filled: true,
+                                fillColor: _bgInput,
+                                border: _outline(_borderDefault),
+                                enabledBorder: _outline(
+                                  _isEmailVerified
+                                      ? _borderSuccess
+                                      : _borderDefault,
+                                ),
+                                focusedBorder: _outline(
+                                  _isEmailVerified
+                                      ? _borderSuccess
+                                      : _borderFocus,
+                                ),
+                                disabledBorder: _outline(
+                                  _isEmailVerified
+                                      ? _borderSuccess
+                                      : _borderDefault,
+                                ),
+                                suffixIcon: _isEmailVerified
+                                    ? const Icon(Icons.check_circle,
+                                        color: _success, size: 20)
+                                    : null,
+                              ),
                             ),
                           ),
                           const SizedBox(width: 8),
-                          _GradientButton(
-                            text: _isCheckingEmail
-                                ? '확인 중...'
-                                : _isEmailAvailable
-                                    ? '확인완료'
-                                    : '중복확인',
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(horizontal: 14),
-                            bgOverride: _isEmailAvailable ? Colors.green : null,
-                            onTap: (!_isCheckingEmail &&
-                                    !_isEmailAvailable &&
-                                    _usernameCtrl.text.trim().isNotEmpty)
-                                ? _checkEmailDuplicate
-                                : null,
-                          ),
+
+                          // 우측 버튼 (상태에 따라 변경)
+                          if (_isEmailVerified)
+                            Container(
+                              height: 52,
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 16),
+                              decoration: BoxDecoration(
+                                color: _success.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _success),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Text(
+                                '인증완료',
+                                style: TextStyle(
+                                  color: _success,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            )
+                          else if (_showVerificationField)
+                            _SideButton(
+                              text: _resendCooldown > 0
+                                  ? '재발송 (${_resendCooldown}초)'
+                                  : '재발송',
+                              onTap: (_isSendingCode || _resendCooldown > 0)
+                                  ? null
+                                  : _sendVerificationCode,
+                              isSolid: _resendCooldown == 0,
+                            )
+                          else
+                            _SideButton(
+                              text: '인증하기',
+                              onTap: (_emailCtrl.text.isNotEmpty &&
+                                      !_isSendingCode)
+                                  ? _sendVerificationCode
+                                  : null,
+                              isSolid: true,
+                            ),
                         ],
                       ),
-                      if (!_isEmailAvailable && _usernameCtrl.text.isNotEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 6),
-                          child: Text(
-                            '이메일 중복 확인이 필요합니다',
-                            style: TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
-                          ),
-                        ),
 
-                      const SizedBox(height: 16),
+                      // 인증번호 입력 (인증 중)
+                      if (_showVerificationField) ...[
+                        const SizedBox(height: 12),
+                        const _FieldLabel('인증번호'),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: _verificationCodeCtrl,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w500,
+                                  color: _textPrimary,
+                                ),
+                                decoration: InputDecoration(
+                                  hintText: '인증번호 6자리',
+                                  hintStyle: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w400,
+                                    color: _textPlaceholder,
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 16),
+                                  filled: true,
+                                  fillColor: _bgInput,
+                                  border: _outline(_borderDefault),
+                                  enabledBorder: _outline(_borderDefault),
+                                  focusedBorder: _outline(_borderFocus),
+                                  suffixIcon: _remainingSeconds > 0
+                                      ? Padding(
+                                    padding:
+                                    const EdgeInsets.only(right: 16),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                      MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          '${_remainingSeconds ~/ 60}:${(_remainingSeconds % 60).toString().padLeft(2, '0')}',
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: _error,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                      : null,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _SideButton(
+                              text: '확인',
+                              onTap: _isVerifyingCode ? null : _verifyCode,
+                              isSolid: true,
+                            ),
+                          ],
+                        ),
+                        if (_remainingSeconds == 0)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 6, left: 4),
+                            child: Text(
+                              '인증시간이 만료되었습니다. 재발송해주세요.',
+                              style: TextStyle(fontSize: 12, color: _error),
+                            ),
+                          ),
+                      ],
+
+                      const SizedBox(height: 12),
 
                       // 비밀번호
                       const _FieldLabel('비밀번호'),
                       TextField(
                         controller: _pwCtrl,
                         obscureText: _obscure,
-                        autofillHints: const <String>[],
-                        enableSuggestions: false,
-                        autocorrect: false,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: _textPrimary,
+                        ),
                         decoration: InputDecoration(
                           hintText: '8자 이상 입력해주세요',
+                          hintStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w400,
+                            color: _textPlaceholder,
+                          ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
+                              horizontal: 16, vertical: 16),
                           filled: true,
-                          fillColor: const Color(0xFFF8F7FF),
-                          border: _outline(Colors.grey.shade300),
-                          enabledBorder: _outline(Colors.grey.shade300),
-                          focusedBorder: _outline(_purple),
+                          fillColor: _bgInput,
+                          border: _outline(_borderDefault),
+                          enabledBorder: _outline(_borderDefault),
+                          focusedBorder: _outline(_borderFocus),
                           suffixIcon: IconButton(
-                            onPressed: () => setState(() => _obscure = !_obscure),
+                            onPressed: () =>
+                                setState(() => _obscure = !_obscure),
                             icon: Icon(
-                              _obscure ? Icons.visibility_off : Icons.visibility,
-                              color: Colors.grey.shade500,
+                              _obscure
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
+                              color: const Color(0xFF9CA3AF),
                             ),
                           ),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 12),
 
                       // 비밀번호 확인
                       const _FieldLabel('비밀번호 확인'),
                       TextField(
                         controller: _pwConfirmCtrl,
                         obscureText: _obscureConfirm,
-                        autofillHints: const <String>[],
-                        enableSuggestions: false,
-                        autocorrect: false,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: _textPrimary,
+                        ),
                         decoration: InputDecoration(
                           hintText: '비밀번호를 다시 입력해주세요',
+                          hintStyle: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w400,
+                            color: _textPlaceholder,
+                          ),
                           contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 14),
+                              horizontal: 16, vertical: 16),
                           filled: true,
-                          fillColor: const Color(0xFFF8F7FF),
-                          border: _outline(Colors.grey.shade300),
-                          enabledBorder: _outline(Colors.grey.shade300),
-                          focusedBorder: _outline(_purple),
+                          fillColor: _bgInput,
+                          border: _outline(_borderDefault),
+                          enabledBorder: _outline(_borderDefault),
+                          focusedBorder: _outline(_borderFocus),
                           suffixIcon: IconButton(
-                            onPressed: () =>
-                                setState(() => _obscureConfirm = !_obscureConfirm),
+                            onPressed: () => setState(
+                                    () => _obscureConfirm = !_obscureConfirm),
                             icon: Icon(
                               _obscureConfirm
                                   ? Icons.visibility_off
@@ -467,8 +699,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
             // Bottom button
             Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24).copyWith(bottom: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 24)
+                  .copyWith(bottom: 24),
               child: _GradientButton(
                 text: _loading ? '가입 중...' : '가입하기',
                 onTap: (!_loading && _canSubmit) ? _submit : null,
@@ -533,13 +765,13 @@ class _GradientButton extends StatelessWidget {
             gradient: bgOverride != null
                 ? null
                 : const LinearGradient(
-                    begin: Alignment.centerLeft,
-                    end: Alignment.centerRight,
-                    colors: [
-                      _RegisterScreenState._purple,
-                      _RegisterScreenState._pink
-                    ],
-                  ),
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [
+                Color(0xFFCC6FF3), // gradientStart
+                Color(0xFFFF8ACB), // gradientEnd
+              ],
+            ),
             color: bgOverride,
           ),
           alignment: Alignment.center,
@@ -548,6 +780,153 @@ class _GradientButton extends StatelessWidget {
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 작은 버튼 ("재발송", "확인" - suffixIcon 내부용)
+class _SmallButton extends StatelessWidget {
+  const _SmallButton({
+    required this.text,
+    required this.onTap,
+    required this.isGradient,
+  });
+
+  final String text;
+  final VoidCallback? onTap;
+  final bool isGradient;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: enabled ? onTap : null,
+        child: Container(
+          height: 32,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            gradient: isGradient
+                ? const LinearGradient(
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                    colors: [Color(0xFFCC6FF3), Color(0xFFFF8ACB)],
+                  )
+                : null,
+            color: isGradient ? null : const Color(0xFFB95AED),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 메인 버튼 ("인증하기")
+class _MainButton extends StatelessWidget {
+  const _MainButton({
+    required this.text,
+    required this.onTap,
+    required this.height,
+  });
+
+  final String text;
+  final VoidCallback? onTap;
+  final double height;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: enabled ? onTap : null,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(999),
+            gradient: const LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: [Color(0xFFCC6FF3), Color(0xFFFF8ACB)],
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 입력창 우측에 붙는 사이드 버튼
+class _SideButton extends StatelessWidget {
+  const _SideButton({
+    required this.text,
+    required this.onTap,
+    this.isSolid = false,
+  });
+
+  final String text;
+  final VoidCallback? onTap;
+  final bool isSolid;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool enabled = onTap != null;
+
+    return Opacity(
+      opacity: enabled ? 1 : 0.4,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          height: 52, // TextField 높이와 맞춤
+          constraints: const BoxConstraints(minWidth: 80),
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: isSolid
+                ? const LinearGradient(
+                    colors: [Color(0xFFCC6FF3), Color(0xFFFF8ACB)],
+                  )
+                : null,
+            color: isSolid ? null : Colors.white,
+            border: isSolid ? null : Border.all(
+              color: const Color(0xFFCC6FF3),
+              width: 1.5,
+            ),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            text,
+            style: TextStyle(
+              color: isSolid ? Colors.white : const Color(0xFFCC6FF3),
+              fontWeight: FontWeight.w600,
+              fontSize: 14,
             ),
           ),
         ),
@@ -568,14 +947,13 @@ class _GradientCheck extends StatelessWidget {
       height: 24,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(6),
-        border: checked ? null : Border.all(color: const Color(0xFFD1D5DB), width: 2),
+        border: checked
+            ? null
+            : Border.all(color: const Color(0xFFD1D5DB), width: 2),
         gradient: checked
             ? const LinearGradient(
-                colors: [
-                  _RegisterScreenState._purple,
-                  _RegisterScreenState._pink
-                ],
-              )
+          colors: [Color(0xFFCC6FF3), Color(0xFFFF8ACB)],
+        )
             : null,
       ),
       child: checked
@@ -604,20 +982,20 @@ class _AgreeRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF374151), fontSize: 14)),
+          Text(label,
+              style: const TextStyle(color: Color(0xFF374151), fontSize: 14)),
           Container(
             width: 20,
             height: 20,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(4),
-              border: checked ? null : Border.all(color: const Color(0xFFD1D5DB), width: 2),
+              border: checked
+                  ? null
+                  : Border.all(color: const Color(0xFFD1D5DB), width: 2),
               gradient: checked
                   ? const LinearGradient(
-                      colors: [
-                        _RegisterScreenState._purple,
-                        _RegisterScreenState._pink
-                      ],
-                    )
+                colors: [Color(0xFFCC6FF3), Color(0xFFFF8ACB)],
+              )
                   : null,
             ),
             child: checked

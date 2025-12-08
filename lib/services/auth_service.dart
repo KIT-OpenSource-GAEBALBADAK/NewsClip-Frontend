@@ -126,6 +126,133 @@ class AuthService {
     final token = await getAccessToken();
     return token != null && token.isNotEmpty;
   }
+
+  /// 이메일 인증번호 전송 (비밀번호 찾기용)
+  /// POST /auth/email/send-code
+  /// type: "reset" - 비밀번호 찾기용
+  Future<Map<String, dynamic>> sendPasswordResetCode(String email) async {
+    try {
+      print('🔵 비밀번호 찾기 인증번호 전송 요청');
+      print('🔵 email: $email');
+
+      final response = await _dio.post('/auth/email/send-code', data: {
+        'email': email,
+        'type': 'reset',
+      });
+
+      print('✅ 응답 코드: ${response.statusCode}');
+      print('✅ 응답 데이터: ${response.data}');
+
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
+        return response.data as Map<String, dynamic>;
+      }
+      throw Exception('인증번호 전송에 실패했습니다.');
+    } on DioException catch (e) {
+      print('❌ DioException 타입: ${e.type}');
+      print('❌ 응답 코드: ${e.response?.statusCode}');
+      print('❌ 응답 데이터: ${e.response?.data}');
+
+      if (e.response?.statusCode == 404) {
+        throw Exception('가입되지 않은 이메일입니다.');
+      }
+      if (e.response?.statusCode == 400) {
+        final message = e.response?.data['message'] ?? '잘못된 요청입니다.';
+        throw Exception(message);
+      }
+      throw Exception('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+    } catch (e) {
+      print('❌ 일반 예외: $e');
+      rethrow;
+    }
+  }
+
+  /// 이메일 인증번호 검증 (비밀번호 찾기용)
+  /// POST /auth/email/verify-code
+  /// type: "reset" - 비밀번호 찾기용
+  /// 성공 시 reset_token 반환
+  Future<String> verifyPasswordResetCode(String email, String code) async {
+    try {
+      print('🔵 비밀번호 찾기 인증번호 검증 요청');
+      print('🔵 email: $email');
+      print('🔵 code: $code');
+
+      final response = await _dio.post('/auth/email/verify-code', data: {
+        'email': email,
+        'code': code,
+        'type': 'reset',
+      });
+
+      print('✅ 응답 코드: ${response.statusCode}');
+      print('✅ 응답 데이터: ${response.data}');
+
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
+        final resetToken = response.data['data']['reset_token'] as String?;
+        if (resetToken == null || resetToken.isEmpty) {
+          throw Exception('reset_token을 받지 못했습니다.');
+        }
+        return resetToken;
+      }
+      throw Exception('인증번호 검증에 실패했습니다.');
+    } on DioException catch (e) {
+      print('❌ DioException 타입: ${e.type}');
+      print('❌ 응답 코드: ${e.response?.statusCode}');
+      print('❌ 응답 데이터: ${e.response?.data}');
+
+      if (e.response?.statusCode == 400) {
+        throw Exception('인증번호가 일치하지 않습니다.');
+      }
+      if (e.response?.statusCode == 410) {
+        throw Exception('인증번호가 만료되었습니다. 재발송해주세요.');
+      }
+      throw Exception('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+    } catch (e) {
+      print('❌ 일반 예외: $e');
+      rethrow;
+    }
+  }
+
+  /// 비밀번호 재설정 (비로그인 상태)
+  /// POST /auth/password/reset
+  Future<bool> resetPassword({
+    required String email,
+    required String resetToken,
+    required String newPassword,
+  }) async {
+    try {
+      print('🔵 비밀번호 재설정 요청');
+      print('🔵 email: $email');
+
+      final response = await _dio.post('/auth/password/reset', data: {
+        'email': email,
+        'reset_token': resetToken,
+        'new_password': newPassword,
+      });
+
+      print('✅ 응답 코드: ${response.statusCode}');
+      print('✅ 응답 데이터: ${response.data}');
+
+      if (response.statusCode == 200 && response.data['status'] == 'success') {
+        return true;
+      }
+      throw Exception('비밀번호 재설정에 실패했습니다.');
+    } on DioException catch (e) {
+      print('❌ DioException 타입: ${e.type}');
+      print('❌ 응답 코드: ${e.response?.statusCode}');
+      print('❌ 응답 데이터: ${e.response?.data}');
+
+      if (e.response?.statusCode == 400) {
+        final message = e.response?.data['message'] ?? '잘못된 요청입니다.';
+        throw Exception(message);
+      }
+      if (e.response?.statusCode == 401) {
+        throw Exception('유효하지 않은 인증 토큰입니다.');
+      }
+      throw Exception('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
+    } catch (e) {
+      print('❌ 일반 예외: $e');
+      rethrow;
+    }
+  }
 }
 
 // ========== 편의 함수들 ==========
@@ -141,4 +268,22 @@ Future<void> logout() => AuthService().logout();
 Future<bool> isLoggedIn() => AuthService().isLoggedIn();
 
 Future<String?> getAccessToken() => AuthService().getAccessToken();
+
+// 비밀번호 찾기/재설정 관련
+Future<Map<String, dynamic>> sendPasswordResetCode(String email) =>
+    AuthService().sendPasswordResetCode(email);
+
+Future<String> verifyPasswordResetCode(String email, String code) =>
+    AuthService().verifyPasswordResetCode(email, code);
+
+Future<bool> resetPassword({
+  required String email,
+  required String resetToken,
+  required String newPassword,
+}) =>
+    AuthService().resetPassword(
+      email: email,
+      resetToken: resetToken,
+      newPassword: newPassword,
+    );
 
