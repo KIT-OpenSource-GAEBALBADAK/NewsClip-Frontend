@@ -25,16 +25,17 @@ class NewsCard {
 
   factory NewsCard.fromJson(Map<String, dynamic> json) {
     return NewsCard(
-      shortId: json['shortId'] as int,
-      originalNewsId: json['originalNewsId'] as int,
-      summary: json['summary'] as String,
-      imageUrl: json['imageUrl'] as String,
-      title: json['title'] as String,
-      likeCount: json['likeCount'] as int,
-      dislikeCount: json['dislikeCount'] as int,
-      commentCount: json['commentCount'] as int,
-      isLiked: json['isLiked'] as bool,
-      isDisliked: json['isDisliked'] as bool,
+      shortId: json['shortId'] as int? ?? json['short_id'] as int? ?? 0,
+      originalNewsId: json['originalNewsId'] as int? ?? json['original_news_id'] as int? ?? 0,
+      summary: json['summary'] as String? ?? '',
+      imageUrl: json['imageUrl'] as String? ?? json['image_url'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      likeCount: json['likeCount'] as int? ?? json['like_count'] as int? ?? 0,
+      dislikeCount: json['dislikeCount'] as int? ?? json['dislike_count'] as int? ?? 0,
+      commentCount: json['commentCount'] as int? ?? json['comment_count'] as int? ?? 0,
+      // 🔥 snake_case와 camelCase 둘 다 지원
+      isLiked: json['is_liked'] as bool? ?? json['isLiked'] as bool? ?? false,
+      isDisliked: json['is_disliked'] as bool? ?? json['isDisliked'] as bool? ?? false,
     );
   }
 }

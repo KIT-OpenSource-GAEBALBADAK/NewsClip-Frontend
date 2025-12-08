@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/news_item.dart';
 import '../../models/comment.dart';
 import '../../services/news_list_service.dart';
@@ -54,6 +55,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
   void initState() {
     super.initState();
     _activeCategory = _categories.first;
+    _loadSavedStates(); // 🔥 저장된 상태 복원
     _loadProfile();
     _loadNews(isRefresh: true);
     _scrollCtrl.addListener(() {
@@ -79,6 +81,39 @@ class _NewsListScreenState extends State<NewsListScreen> {
 
   void _onProfileUpdated() {
     _loadProfile();
+  }
+
+  // 🔥 로컬 저장소에서 이전 상태 복원
+  Future<void> _loadSavedStates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final likedList = prefs.getStringList('liked_news') ?? [];
+      final dislikedList = prefs.getStringList('disliked_news') ?? [];
+      final bookmarkedList = prefs.getStringList('bookmarked_news') ?? [];
+
+      setState(() {
+        _liked.addAll(likedList.map((e) => int.tryParse(e)).whereType<int>());
+        _disliked.addAll(dislikedList.map((e) => int.tryParse(e)).whereType<int>());
+        _bookmarked.addAll(bookmarkedList.map((e) => int.tryParse(e)).whereType<int>());
+      });
+
+      debugPrint('✅ 로컬 저장소에서 상태 복원:');
+      debugPrint('   좋아요: ${_liked.length}개, 싫어요: ${_disliked.length}개, 북마크: ${_bookmarked.length}개');
+    } catch (e) {
+      debugPrint('❌ 상태 복원 실패: $e');
+    }
+  }
+
+  // 🔥 로컬 저장소에 상태 저장
+  Future<void> _saveStates() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('liked_news', _liked.map((e) => e.toString()).toList());
+      await prefs.setStringList('disliked_news', _disliked.map((e) => e.toString()).toList());
+      await prefs.setStringList('bookmarked_news', _bookmarked.map((e) => e.toString()).toList());
+    } catch (e) {
+      debugPrint('❌ 상태 저장 실패: $e');
+    }
   }
 
   Future<void> _loadProfile() async {
@@ -257,6 +292,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
                                     _disliked.remove(item.id);
                                   }
                                   _applyFilter();
+                                  _saveStates(); // 🔥 상태 저장
                                 }
                               });
                             } catch (e) {
@@ -294,6 +330,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
                                     _disliked.remove(item.id);
                                   }
                                   _applyFilter();
+                                  _saveStates(); // 🔥 상태 저장
                                 }
                               });
                             } catch (e) {
@@ -316,6 +353,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
                                 } else {
                                   _bookmarked.remove(item.id);
                                 }
+                                _saveStates(); // 🔥 상태 저장
                               });
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
