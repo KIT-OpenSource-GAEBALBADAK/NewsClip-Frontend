@@ -31,7 +31,7 @@ class CommunityService {
 
       // [실제 서버 응답 처리]
       if (response.data['status'] == 'success') {
-        final List<dynamic> postListJson = response.data['data']['posts'];
+        final List<dynamic> postListJson = response.data['data']['posts'] ?? [];
         return postListJson
             .map((json) => CommunityPost.fromJson(json))
             .toList();
@@ -153,6 +153,73 @@ class CommunityService {
       throw Exception('상호작용에 실패했습니다: ${e.message}');
     } catch (e) {
       print('❌ CommunityService.interactWithPost() Exception: $e');
+      throw Exception('알 수 없는 오류가 발생했습니다.');
+    }
+  }
+
+  /// 5.4. 게시글 삭제
+  /// DELETE /community/posts/{post_id}
+  Future<void> deletePost(String postId) async {
+    try {
+      final response = await _dio.delete('/community/posts/$postId');
+
+      if (response.data['status'] == 'success') {
+        // 성공 시 아무것도 리턴하지 않거나, 로그만 남김
+        print('✅ 게시글 삭제 성공: $postId');
+      } else {
+        throw Exception('Failed to delete post: ${response.data['message']}');
+      }
+    } on DioException catch (e) {
+      print('❌ CommunityService.deletePost() DioException: $e');
+      throw Exception('게시글 삭제 실패: ${e.message}');
+    } catch (e) {
+      print('❌ CommunityService.deletePost() Exception: $e');
+      throw Exception('알 수 없는 오류가 발생했습니다.');
+    }
+  }
+
+  /// 6.1. 댓글 목록 조회
+  /// GET /community/posts/{id}/comments
+  Future<List<CommentItem>> getComments(String postId) async {
+    try {
+
+      print('🔍 [DEBUG] 요청하려는 postId: "$postId"');
+      print('🔍 [DEBUG] 실제 요청 URL: /community/posts/$postId/comments');
+
+      final response = await _dio.get('/community/posts/$postId/comments');
+
+      if (response.data['status'] == 'success') {
+        final List<dynamic> list = response.data['data'] ?? [];
+        return list.map((e) => CommentItem.fromJson(e)).toList();
+      } else {
+        throw Exception('댓글 조회 실패: ${response.data['message']}');
+      }
+    } on DioException catch (e) {
+      print('❌ CommunityService.getComments() DioException: $e');
+      throw Exception('댓글을 불러오지 못했습니다: ${e.message}');
+    } catch (e) {
+      print('❌ CommunityService.getComments() Exception: $e');
+      throw Exception('알 수 없는 오류가 발생했습니다.');
+    }
+  }
+
+  /// 6.2. 댓글 작성
+  /// POST /community/posts/{id}/comments
+  Future<void> createComment(String postId, String content) async {
+    try {
+      final response = await _dio.post(
+        '/community/posts/$postId/comments',
+        data: {'content': content},
+      );
+
+      if (response.data['status'] != 'success') {
+        throw Exception('댓글 작성 실패: ${response.data['message']}');
+      }
+    } on DioException catch (e) {
+      print('❌ CommunityService.createComment() DioException: $e');
+      throw Exception('댓글 작성에 실패했습니다: ${e.message}');
+    } catch (e) {
+      print('❌ CommunityService.createComment() Exception: $e');
       throw Exception('알 수 없는 오류가 발생했습니다.');
     }
   }

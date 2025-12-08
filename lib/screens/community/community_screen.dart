@@ -4,12 +4,12 @@ import 'package:flutter/gestures.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui' as ui;
 
-import '../../widgets/common/bottom_navigation.dart';
+import '../../services/profile_service.dart';
+// import '../../widgets/common/bottom_navigation.dart';
 import 'community_create_screen.dart';
 import 'package:newsclip/services/community_service.dart';
 import 'package:newsclip/models/community.dart';
 import 'community_sheet.dart'; // 👈 [추가] 이 줄을 추가하세요.
-import 'package:newsclip/services/community_service.dart';
 
 class CommunityScreen extends StatefulWidget {
   const CommunityScreen({super.key});
@@ -75,11 +75,26 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  void _handleDislike(CommunityPost post) {
+  void _handleDislike(CommunityPost post) async {
     setState(() {
       post.toggleDislike();
     });
-    // _communityService.interactWithPost(post.postId, 'dislike')...
+    try {
+      // await를 붙여야 에러가 났을 때 catch로 잡을 수 있습니다.
+      await _communityService.interactWithPost(post.postId, 'dislike');
+    } catch (e) {
+      // 3. 실패 시 UI 롤백 (다시 원래대로 되돌림)
+      setState(() {
+        post.toggleDislike();
+      });
+
+      // (선택 사항) 에러 메시지 띄우기
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('싫어요 처리에 실패했습니다: $e')),
+        );
+      }
+    }
   }
 
 
@@ -203,79 +218,110 @@ class _CommunityScreenState extends State<CommunityScreen> {
 }
 
 // ======== UI 파츠 (스크린 레벨) ========
-// (_Header, _SearchField, _SquareIconButton, _Chips 위젯은 변경 없음)
-class _Header extends StatelessWidget {
-// ... (이하 동일)
+class _Header extends StatefulWidget {
+  const _Header({Key? key}) : super(key: key);
+
+  @override
+  State<_Header> createState() => _HeaderState();
+}
+
+class _HeaderState extends State<_Header> {
+  final ProfileService _profileService = ProfileService();
+  late Future<Map<String, dynamic>> _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = _profileService.getMyProfile();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 82,
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95),
-        border: const Border(
-          bottom: BorderSide(color: Color(0x268B5CF6), width: 1.1),
-        ),
-      ),
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Row(
-        children: [
-          // 아바타
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: Image.network(
-              'https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=80&h=80&fit=crop&crop=face',
-              width: 40,
-              height: 40,
-              fit: BoxFit.cover,
-            ),
-          ),
-          const SizedBox(width: 12),
-          // 인사/서브텍스트
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('안녕하세요 👋',
-                    style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        height: 1.2)),
-                SizedBox(height: 4),
-                Text('오늘의 뉴스를 확인해보세요',
-                    style: TextStyle(fontSize: 14, color: Color(0xFF6B6B84))),
-              ],
-            ),
-          ),
-          // 우측 아이콘 + 배지
-          Stack(
-            clipBehavior: Clip.none,
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _profileFuture,
+      builder: (context, snapshot) {
+        // --- 1. 기본값 설정 ---
+        String displayNickname = '안녕하세요 👋';
+        String? profileImageUrl;
+
+        // --- 2. 데이터 파싱 로직 (profile_screen.dart 참고) ---
+        if (snapshot.hasData && snapshot.data != null) {
+          final rootData = snapshot.data!;
+
+          // 🔥 핵심 수정: 'user' 객체 먼저 추출
+          final userMap = rootData['user'];
+
+          if (userMap is Map<String, dynamic>) {
+            // 닉네임 설정
+            final nickname = userMap['nickname'];
+            if (nickname != null) {
+              displayNickname = '$nickname님 👋';
+            }
+
+            // 프로필 이미지 설정 (profile_image 키 사용)
+            final serverImage = userMap['profile_image'];
+            if (serverImage != null && serverImage.toString().isNotEmpty) {
+              profileImageUrl = serverImage.toString();
+            }
+          }
+        }
+
+        // --- 3. UI 렌더링 ---
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+          child: Row(
             children: [
-              IconButton(
-                onPressed: () {},
-                icon: const Icon(Icons.notifications_none_rounded),
+              // 프로필 이미지 아바타
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: Colors.grey[300],
+                // 이미지가 있으면 NetworkImage, 없으면 null
+                backgroundImage: (profileImageUrl != null)
+                    ? NetworkImage(profileImageUrl)
+                    : null,
+                // 이미지가 없을 때 보여줄 아이콘
+                child: (profileImageUrl == null)
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
               ),
-              Positioned(
-                right: 2,
-                top: -2,
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD4183D),
-                    borderRadius: BorderRadius.circular(999),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 닉네임 표시
+                  Text(
+                    displayNickname,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  child: const Text('3',
-                      style: TextStyle(color: Colors.white, fontSize: 12)),
-                ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    '오늘의 뉴스를 확인해보세요',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
               ),
+              const Spacer(),
+              // 알림 아이콘 (기존 유지)
+              Stack(
+                children: [
+                  const Icon(Icons.notifications_outlined, size: 28, color: Colors.black54),
+                  Positioned(
+                    right: 2,
+                    top: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              const Icon(Icons.more_horiz, size: 28, color: Colors.black54),
             ],
           ),
-          IconButton(
-            onPressed: () {},
-            icon: const Icon(Icons.more_horiz_rounded),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -756,13 +802,23 @@ class _PostCardState extends State<_PostCard>
               // 댓글
               InkWell(
                 borderRadius: BorderRadius.circular(8),
-                onTap: () {
+                onTap: () async {
                   /*
                   // 20. [수정] CommentsPage에 CommunityPost 전달
                   Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => CommentsPage(post: p)));
                    */
                   // 20. [수정] CommentsPage 대신 CommentSheet를 띄웁니다.
+                  // 2️⃣ await 추가: 댓글창이 닫힐 때까지 여기서 기다림
+                  await showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (sheetContext) {
+                      return CommentSheet(post: p);
+                    },
+                  );
+                  /*
                   showModalBottomSheet(
                     context: context,
                     isScrollControlled: true, // 👈 시트가 키보드 등에 의해 가려지지 않게 함
@@ -771,6 +827,10 @@ class _PostCardState extends State<_PostCard>
                       return CommentSheet(post: p); // 👈 p를 CommentSheet로 전달
                     },
                   );
+                  */
+                  if (mounted) {
+                    setState(() {});
+                  }
                 },
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
