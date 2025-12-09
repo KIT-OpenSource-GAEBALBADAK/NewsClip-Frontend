@@ -25,8 +25,8 @@ class PostAuthor {
       nickname: json['nickname'] as String? ?? '알 수 없는 사용자',
 
       // 5.1은 'profileImage', 5.2는 'profile_image'일 수 있으므로 둘 다 확인
-      profileImage: json['profileImage'] as String? ?? json['profile_image'] as String?,
-
+      // [수정] API 명세에 맞춰 snake_case('profile_image')를 우선 확인
+      profileImage: (json['profile_image'] as String?) ?? (json['profileImage'] as String?),
       role: role,
     );
   }
@@ -77,7 +77,8 @@ class CommunityPost {
     return CommunityPost(
       // [수정] 5.1 'postId'(String) / 5.2 'ID'(int or String) -> .toString()으로 통일
       //postId: (json['postId'] ?? json['ID'] ?? json['id'] ?? json['post_id'] ?? 0).toString(),
-      postId: (json['postId'] ?? json['post_id'] ?? json['id'] ?? json['ID'] ?? 0).toString(),
+      postId: (json['post_id'] ?? json['postId'] ?? json['id'] ?? 0).toString(),
+
       // [수정] 5.1 'title' / 5.2 'Title' - null 체크 강화
       title: (json['title'] as String?) ?? (json['Title'] as String?) ?? '',
 
@@ -98,18 +99,20 @@ class CommunityPost {
           .map((item) => item as String)
           .toList(),
 
-      // [수정] 5.1 'createdAt' / 5.2 'CreatedAt' - null 체크 강화
+      // [수정] 명세 5.1: "created_at" (snake_case)
       createdAt: DateTime.parse(
-          (json['createdAt'] as String?) ?? (json['CreatedAt'] as String?) ?? DateTime.now().toIso8601String()),
+          (json['created_at'] as String?) ?? (json['createdAt'] as String?) ?? DateTime.now().toIso8601String()
+      ),
 
-      // [수정] 5.1 'camelCase' / 5.2 'PascalCase' (null일 경우 0)
-      viewCount: json['viewCount'] as int? ?? json['ViewCount'] as int? ?? 0,
-      likeCount: json['likeCount'] as int? ?? json['LikeCount'] as int? ?? 0,
-      dislikeCount: json['dislikeCount'] as int? ?? json['DislikeCount'] as int? ?? 0,
-      commentCount: json['commentCount'] as int? ?? json['CommentCount'] as int? ?? 0,
+      // [수정] 명세 5.1: 카운트 필드 snake_case 적용 ("view_count" 등)
+      viewCount: json['view_count'] as int? ?? 0,
+      likeCount: json['like_count'] as int? ?? 0,
+      dislikeCount: json['dislike_count'] as int? ?? 0,
+      commentCount: json['comment_count'] as int? ?? 0,
 
-      isLiked: json['isLiked'] as bool? ?? json['is_liked'] as bool? ?? false,
-      isDisliked: json['isDisliked'] as bool? ?? json['is_disliked'] as bool? ?? false,
+      // [수정] 명세 5.1: 로그인한 유저의 상호작용 상태 ("is_liked", "is_disliked")
+      isLiked: json['is_liked'] as bool? ?? false,
+      isDisliked: json['is_disliked'] as bool? ?? false,
     );
   }
 
