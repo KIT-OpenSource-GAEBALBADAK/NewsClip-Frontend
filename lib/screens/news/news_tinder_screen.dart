@@ -416,7 +416,7 @@ class _NewsCard extends StatelessWidget {
   Widget build(BuildContext context) {
     // 텍스트 전처리
     final String fullText = article.summary.replaceAll('\n', '  ');
-    final String tag = '#미디어';
+    final String tag = '# 뉴스 클립';
 
     // article.title을 제목으로 사용
     final String title = article.title;

@@ -72,6 +72,13 @@ class _NewsListScreenState extends State<NewsListScreen> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 화면이 다시 나타날 때마다 프로필 갱신
+    _loadProfile();
+  }
+
+  @override
   void dispose() {
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
@@ -80,6 +87,7 @@ class _NewsListScreenState extends State<NewsListScreen> {
   }
 
   void _onProfileUpdated() {
+    debugPrint('🔔 프로필 업데이트 알림 받음 -> 프로필 재로드');
     _loadProfile();
   }
 
@@ -517,22 +525,6 @@ class _Header extends StatelessWidget {
               ),
             ],
           ),
-          const Spacer(),
-          Stack(
-            children: [
-              const Icon(Icons.notifications_outlined, size: 28, color: Colors.black54),
-              Positioned(
-                right: 2, top: 2,
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
-                  child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 8),
-          const Icon(Icons.more_horiz, size: 28, color: Colors.black54),
         ],
       ),
     );

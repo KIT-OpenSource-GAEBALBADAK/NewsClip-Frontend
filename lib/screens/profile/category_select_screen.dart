@@ -86,23 +86,32 @@ class _CategorySelectScreenState extends State<CategorySelectScreen> {
       // 🔥 프로필 캐시 무효화 (새로운 데이터를 다시 불러오도록)
       ProfileCache.clearCache();
 
+      // 3️⃣ 프로필을 다시 불러와서 캐시 및 전역 상태 업데이트
+      debugPrint('🔵 프로필 재로드 시작');
+      await _profileService.getMyProfile(); // 캐시에 저장됨
+      debugPrint('✅ 프로필 재로드 완료 (캐시 업데이트됨)');
+
       // 🔥 전역 프로필 업데이트 알림
       profileUpdateNotifier.value++;
+
+      debugPrint('✅ 홈 화면으로 이동');
+
+      if (!mounted) return;
+
+      // 🔥 이전 화면들을 모두 제거하고 홈 화면으로 이동
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+        (route) => false, // 모든 이전 라우트 제거
+      );
 
       // 성공 메시지 표시
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('프로필 설정이 완료되었습니다!'),
+          content: Text('프로필 설정이 완료되었습니다! 🎉'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 2),
         ),
       );
-
-      debugPrint('✅ 홈 화면으로 이동');
-
-      // 🔥 두 번 pop하여 프로필 설정 화면과 카테고리 선택 화면 모두 닫기
-      Navigator.of(context).pop(true); // 카테고리 선택 완료
-      Navigator.of(context).pop(true); // 프로필 설정 완료
     } catch (e) {
       debugPrint('❌ 에러 발생: $e');
       if (!mounted) return;
