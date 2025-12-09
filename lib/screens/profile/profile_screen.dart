@@ -329,6 +329,23 @@ class _ProfileScreenState extends State<ProfileScreen>
                   '프로필',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
+                const Spacer(), // 빈 공간을 채워 아이콘을 오른쪽 끝으로 밈
+                IconButton(
+                  padding: EdgeInsets.zero, // 버튼 패딩 제거 (선택사항)
+                  constraints: const BoxConstraints(), // 버튼 크기 최소화 (선택사항)
+                  icon: Icon(
+                    Icons.refresh,
+                    color: Theme.of(context).colorScheme.primary, // 기존 아이콘 색상과 통일
+                  ),
+                  onPressed: () {
+                    // 로딩 상태를 true로 변경하여 화면에 로딩 표시
+                    setState(() {
+                      _isLoading = true;
+                    });
+                    // 데이터 다시 불러오기
+                    _loadProfileData();
+                  },
+                ),
               ],
             ),
           ),
