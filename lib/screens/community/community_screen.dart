@@ -312,7 +312,7 @@ class _HeaderState extends State<_Header> {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    '오늘의 뉴스를 확인해보세요',
+                    '오늘의 커뮤니티를 확인해보세요',
                     style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                 ],
