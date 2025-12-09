@@ -78,28 +78,29 @@ class CommunityPost {
       // [수정] 5.1 'postId'(String) / 5.2 'ID'(int or String) -> .toString()으로 통일
       //postId: (json['postId'] ?? json['ID'] ?? json['id'] ?? json['post_id'] ?? 0).toString(),
       postId: (json['postId'] ?? json['post_id'] ?? json['id'] ?? json['ID'] ?? 0).toString(),
-      // [수정] 5.1 'title' / 5.2 'Title'
-      title: json['title'] as String? ?? json['Title'] as String,
+      // [수정] 5.1 'title' / 5.2 'Title' - null 체크 강화
+      title: (json['title'] as String?) ?? (json['Title'] as String?) ?? '',
 
-      // [수정] 5.1 'content' / 5.2 'Content'
-      content: json['content'] as String? ?? json['Content'] as String,
+      // [수정] 5.1 'content' / 5.2 'Content' - null 체크 강화
+      content: (json['content'] as String?) ?? (json['Content'] as String?) ?? '',
 
-      // [수정] 5.1 'category' / 5.2 'Category'
-      category: json['category'] as String? ?? json['Category'] as String,
+      // [수정] 5.1 'category' / 5.2 'Category' - null 체크 강화
+      category: (json['category'] as String?) ?? (json['Category'] as String?) ?? 'general',
 
       // [수정] 5.1 'author' / 5.2 'user'
       author: PostAuthor.fromJson(
           json['author'] as Map<String, dynamic>? ??
-              json['user'] as Map<String, dynamic>),
+              json['user'] as Map<String, dynamic>? ??
+              {}),
 
       // [수정] 5.2 'images'가 null일 경우 '?? []'로 빈 리스트 처리
       images: (json['images'] as List<dynamic>? ?? [])
           .map((item) => item as String)
           .toList(),
 
-      // [수정] 5.1 'createdAt' / 5.2 'CreatedAt'
+      // [수정] 5.1 'createdAt' / 5.2 'CreatedAt' - null 체크 강화
       createdAt: DateTime.parse(
-          json['createdAt'] as String? ?? json['CreatedAt'] as String),
+          (json['createdAt'] as String?) ?? (json['CreatedAt'] as String?) ?? DateTime.now().toIso8601String()),
 
       // [수정] 5.1 'camelCase' / 5.2 'PascalCase' (null일 경우 0)
       viewCount: json['viewCount'] as int? ?? json['ViewCount'] as int? ?? 0,
