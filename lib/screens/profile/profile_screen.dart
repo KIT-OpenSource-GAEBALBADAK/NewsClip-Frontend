@@ -915,6 +915,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     child: Column(
                                       children: [
                                         ..._myComments.map((comment) {
+
+                                          // [디버깅] 실제 서버에서 들어오는 값이 무엇인지 로그로 확인해보세요!
+                                          // print('🔍 댓글 타겟 타입 확인: ${comment.targetType}');
+
                                           return Container(
                                             margin: const EdgeInsets
                                                 .symmetric(vertical: 4),

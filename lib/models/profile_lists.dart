@@ -90,7 +90,7 @@ class MyComment {
     return MyComment(
       commentId: json['comment_id'] ?? 0,
       content: json['content'] ?? '',
-      targetType: json['target_type'] ?? '',
+      targetType: json['targetType'] ?? '',
       targetId: json['target_id'] ?? 0,
       targetTitle: json['target_title'] ?? '',
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
@@ -115,6 +115,7 @@ class MyCommentList {
   });
 
   factory MyCommentList.fromJson(Map<String, dynamic> json) {
+    print('🔥 [DEBUG] 댓글 JSON 원본: $json');
     return MyCommentList(
       comments: (json['comments'] as List<dynamic>?)
           ?.map((e) => MyComment.fromJson(e))
