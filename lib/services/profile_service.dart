@@ -217,4 +217,49 @@ class ProfileService {
       rethrow;
     }
   }
+
+  /// 7.5 내 선호 카테고리 설정
+  /// PUT /me/preferences/categories
+  Future<Map<String, dynamic>> updatePreferredCategories({
+    required List<String> categories,
+  }) async {
+    try {
+      debugPrint('🔵 선호 카테고리 설정 요청: $categories');
+
+      final response = await _dio.put(
+        '/me/preferences/categories',
+        data: {
+          'categories': categories,
+        },
+      );
+
+      debugPrint('✅ 선호 카테고리 설정 성공');
+      return response.data as Map<String, dynamic>;
+
+    } on DioException catch (e) {
+      debugPrint('❌ DioException 발생: ${e.message}');
+
+      if (e.response?.statusCode == 401) {
+        throw '로그인이 필요합니다.';
+      }
+
+      final data = e.response?.data;
+      if (data is Map && data.containsKey('message')) {
+        throw data['message'];
+      }
+
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout) {
+        throw '서버 응답 시간이 초과되었습니다.';
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        throw '네트워크 연결을 확인해주세요.';
+      }
+
+      throw '선호 카테고리 설정 중 오류가 발생했습니다.';
+    } catch (e) {
+      debugPrint('❌ 예상치 못한 오류: $e');
+      rethrow;
+    }
+  }
 }
