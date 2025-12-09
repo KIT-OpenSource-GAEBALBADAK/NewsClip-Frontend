@@ -680,7 +680,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   : Container(
                                 height: 220,
                                 child: Scrollbar(
-                                  thumbVisibility: true,
+                                  thumbVisibility: false,
                                   child: SingleChildScrollView(
                                     physics:
                                     const ClampingScrollPhysics(),
@@ -911,7 +911,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                   ? Container(
                                 height: 220,
                                 child: Scrollbar(
-                                  thumbVisibility: true,
+                                  thumbVisibility: false,
                                   child: SingleChildScrollView(
                                     physics:
                                     const ClampingScrollPhysics(),
