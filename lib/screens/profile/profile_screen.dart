@@ -589,12 +589,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     value: likes,
                                     color: Colors.red,
                                   ),
+                                  /*
                                   _StatCard(
                                     icon: Icons.person_outline,
                                     label: '팔로워',
                                     value: followers,
                                     color: Colors.purple,
                                   ),
+                                  */
                                 ],
                               ),
                             ],
