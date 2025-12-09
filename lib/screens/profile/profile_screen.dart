@@ -1072,6 +1072,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                   child: Column(
                     children: [
                       // 알림 설정
+                      /*
                       Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
@@ -1208,6 +1209,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       const SizedBox(height: 16),
 
                       // 화면 설정 (다크 모드)
+
                       Card(
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(24),
@@ -1281,6 +1283,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ),
                         ),
                       ),
+
+                       */
 
                       const SizedBox(height: 16),
 
