@@ -420,6 +420,9 @@ class _CommentCard extends StatelessWidget {
     final hasReplies = false; // 답글 없음
     final repliesExpanded = false;
 
+    // [추가] 프로필 이미지 URL 가져오기
+    final profileUrl = data.author.profileImage;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -434,8 +437,32 @@ class _CommentCard extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _AvatarCircle(label: authorName.isNotEmpty ? authorName.characters.first : '?'),
+              // 1. 프로필 이미지 로직 (if-else 문법 사용)
+              if (profileUrl != null && profileUrl.startsWith('http'))
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(100),
+                  child: Image.network(
+                    profileUrl,
+                    width: 34,
+                    height: 34,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return _AvatarCircle(
+                        label: authorName.isNotEmpty
+                            ? authorName.characters.first
+                            : '?',
+                      );
+                    },
+                  ),
+                )
+              else
+                _AvatarCircle(
+                  label: authorName.isNotEmpty ? authorName.characters.first : '?',
+                ),
+
               const SizedBox(width: 10),
+
+              // 2. 닉네임 및 정보 영역
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -457,7 +484,7 @@ class _CommentCard extends StatelessWidget {
                                 horizontal: 4, vertical: 1),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(4),
-                              color: accent.withValues(alpha: 0.08),
+                              color: accent.withOpacity(0.08),
                             ),
                             child: const Text(
                               '전문가',
@@ -469,7 +496,6 @@ class _CommentCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                        // expertTag가 별도로 있다면 표시 (현재는 role로 처리)
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -483,6 +509,8 @@ class _CommentCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // 신고 버튼 필요 X
+              /*
               const SizedBox(width: 4),
               TextButton(
                 onPressed: onReport,
@@ -500,6 +528,7 @@ class _CommentCard extends StatelessWidget {
                   ),
                 ),
               ),
+              */
             ],
           ),
 
@@ -515,6 +544,8 @@ class _CommentCard extends StatelessWidget {
             ),
           ),
 
+          // 좋아요 / 싫어요 / 답글 기능 필요 X
+          /*
           const SizedBox(height: 8),
 
           // 좋아요 / 싫어요 / 답글 (UI는 유지하되 데이터는 0/false)
@@ -571,6 +602,7 @@ class _CommentCard extends StatelessWidget {
               ),
             ],
           ),
+          */
 
           // ===== 답글 (API 미지원으로 표시 안 함) =====
           if (hasReplies) ...[

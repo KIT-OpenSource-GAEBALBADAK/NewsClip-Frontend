@@ -43,7 +43,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   // 2. 서버에서 데이터를 가져오는 메서드
   Future<List<CommunityPost>> _fetchPosts() {
-    return _communityService.getPosts(type: _tab, page: 1);
+    //return _communityService.getPosts(type: _tab, page: 1);
+    return _communityService.getPosts(type: 'all', page: 1);
   }
 
   // 3. [수정] 목록을 새로고침하는 메서드 (RefreshIndicator용)
@@ -120,8 +121,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         controller: _search,
                         // 5. 검색어 입력 시 setState만 호출하면 FutureBuilder가 재실행됨
                         onChanged: (_) => setState(() {}))),
+                // 검색 필터 기능 필요 X
+                /*
                 const SizedBox(width: 8),
                 _SquareIconButton(icon: Icons.tune),
+                 */
                 const SizedBox(width: 8),
                 // 6. [수정] 글쓰기 버튼 (새로고침 기능 포함)
                 _SquareIconButton(
@@ -152,7 +156,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             onChanged: (v) {
               setState(() {
                 _tab = v;
-                _refreshPosts(); // 탭 변경 시 새로고침
+                // _refreshPosts(); // 탭 변경 시 새로고침
               });
             },
           ),
@@ -181,6 +185,21 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
                   // 9. 'filtered' 로직을 FutureBuilder 내부로 이동 (검색어 필터링)
                   final filtered = posts.where((p) {
+                    // (A) 데이터 정제: 혹시 모를 대소문자/공백 차이를 없앱니다.
+                    final String postRole = (p.author.role ?? '').trim().toLowerCase();
+                    final bool isExpertPost = postRole == 'expert';
+
+                    // (B) 탭 필터링 (원하는 것만 return true)
+                    if (_tab == 'expert') {
+                      // 전문가 탭: 전문가 글만 보여줌
+                      if (!isExpertPost) return false;
+                    }
+                    else if (_tab == 'general') {
+                      // 일반 탭: 전문가 글은 숨김 (즉, 전문가가 아니면 보여줌)
+                      if (isExpertPost) return false;
+                    }
+                    // 'all' 탭은 위 조건들에 안 걸리므로 모두 통과
+
                     final q = _search.text.trim().toLowerCase();
                     if (q.isEmpty) return true;
 
@@ -299,7 +318,8 @@ class _HeaderState extends State<_Header> {
                 ],
               ),
               const Spacer(),
-              // 알림 아이콘 (기존 유지)
+              // 알림 아이콘 (기존 유지), 점 3개 아이콘 필요 X
+              /*
               Stack(
                 children: [
                   const Icon(Icons.notifications_outlined, size: 28, color: Colors.black54),
@@ -316,6 +336,7 @@ class _HeaderState extends State<_Header> {
               ),
               const SizedBox(width: 8),
               const Icon(Icons.more_horiz, size: 28, color: Colors.black54),
+               */
             ],
           ),
         );
@@ -536,6 +557,9 @@ class _PostCardState extends State<_PostCard>
   Widget build(BuildContext context) {
     // 13. [수정] p는 이제 CommunityPost 타입
     final p = widget.post;
+
+    // [추가] 디버깅 로그: 여기서 Role 값이 실제로 어떻게 들어오는지 확인
+    debugPrint('🔎 [DEBUG] 글ID: ${p.postId} | 작성자: ${p.author.nickname} | Role 값: "${p.author.role}"');
 
     return Container(
       // (Container-Decoration은 변경 없음)

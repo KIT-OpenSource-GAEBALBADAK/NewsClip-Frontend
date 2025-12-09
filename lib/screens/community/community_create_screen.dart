@@ -72,6 +72,8 @@ class _NewPostScreenState extends State<NewPostScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       // ✅ 공통 네비게이션 위젯 사용 (currentIndex 고정 1 = 커뮤니티)
+      // 네이게이션 필요 X
+      /*
       bottomNavigationBar: CustomBottomNavigation(
         currentIndex: 1,
         onTap: (index) {
@@ -81,6 +83,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           // if (index == 1) Navigator.pop(context); // 커뮤니티
         },
       ),
+       */
       body: SafeArea(
         child: Column(
           children: [
