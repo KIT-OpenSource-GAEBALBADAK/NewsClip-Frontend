@@ -167,7 +167,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         commentsCount = apiStatsMap['comment_count'] ?? 0;
         likes = apiStatsMap['total_received_likes'] ?? 0;
 
-        // 4. 자기소개
+
+        // 4. 자기소개 필요 X
         bio = apiUserMap['bio'] ?? data['bio'] ?? '아직 자기소개가 없습니다.';
         _bioController.text = bio;
 
@@ -451,7 +452,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                                     ],
                                   ),
                                   const SizedBox(height: 8),
-                                  // bio + edit
+                                  // bio + edit 필요 X
+                                  /*
                                   isEditing
                                       ? Column(
                                     children: [
@@ -531,6 +533,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       ),
                                     ],
                                   ),
+                                   */
                                   const SizedBox(height: 8),
                                   Text(
                                     joinDate,
