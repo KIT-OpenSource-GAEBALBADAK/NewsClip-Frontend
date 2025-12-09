@@ -453,7 +453,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
               ),
             ),
             Text(
-              '${_content.text.length}/2000',
+              '${_content.text.length}/400',
               style: const TextStyle(
                 color: grayText,
                 fontSize: 12,
@@ -473,7 +473,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
           child: TextField(
             controller: _content,
             maxLines: null,
-            maxLength: 2000,
+            maxLength: 400,
             decoration: const InputDecoration(
               border: InputBorder.none,
               counterText: '',
@@ -548,7 +548,7 @@ class _NewPostScreenState extends State<NewPostScreen> {
               onPressed: () {
                 final current = _content.text;
                 final next = current.isEmpty ? tag : '$current $tag';
-                if (next.length <= 2000) {
+                if (next.length <= 400) {
                   setState(() => _content.text = next);
                 }
               },
