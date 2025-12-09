@@ -85,7 +85,7 @@ class _CommentSheetState extends State<CommentSheet> {
     }
     return list;
   }
-
+  /*
   void _toggleSortType() {
     setState(() {
       _sortType = _sortType == CommentSortType.latest
@@ -96,6 +96,8 @@ class _CommentSheetState extends State<CommentSheet> {
 
   String get _sortLabel =>
       _sortType == CommentSortType.latest ? '최신순' : '인기순';
+   */
+
 
   // ====== 좋아요 / 싫어요 (API 6.1 미지원으로 기능 비활성화) ======
   void _toggleLike(CommentItem c) {
@@ -217,6 +219,7 @@ class _CommentSheetState extends State<CommentSheet> {
                         ],
                       ),
                     ),
+                    /*
                     // 정렬 필터
                     InkWell(
                       onTap: _toggleSortType,
@@ -239,6 +242,7 @@ class _CommentSheetState extends State<CommentSheet> {
                         ),
                       ),
                     ),
+                    */
                     const SizedBox(width: 12),
                     InkWell(
                       onTap: () => Navigator.pop(context),
