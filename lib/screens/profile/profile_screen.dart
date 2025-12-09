@@ -15,6 +15,10 @@ import '../../services/profile_service.dart';
 
 import '../home_screen.dart'; // profileUpdateNotifier 사용
 
+import 'change_password_screen.dart';
+import 'profile_change_screen.dart';
+import 'privacy_policy_screen.dart';
+
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -1303,8 +1307,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                               ),
                               const SizedBox(height: 12),
                               OutlinedButton.icon(
-                                onPressed: () {
-                                  // TODO: 계정 정보 수정
+                                onPressed: () async {
+                                  // [수정] ProfileSetupScreen으로 이동
+                                  // await를 써서 갔다 올 때까지 기다림
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ProfileChangeScreen(),
+                                    ),
+                                  );
+
+                                  // [추가] 갔다 온 후 프로필 정보를 다시 불러와서 화면 갱신
+                                  _loadProfileData();
                                 },
                                 style: OutlinedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(40),
@@ -1314,19 +1328,45 @@ class _ProfileScreenState extends State<ProfileScreen>
                                 label: const Text('계정 정보 수정'),
                               ),
                               const SizedBox(height: 8),
+
                               OutlinedButton.icon(
                                 onPressed: () {
-                                  // TODO: 개인정보 처리방침
+                                  // 개인정보 처리방침 화면으로 이동
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const PrivacyPolicyScreen(),
+                                    ),
+                                  );
                                 },
                                 style: OutlinedButton.styleFrom(
                                   minimumSize: const Size.fromHeight(40),
                                   alignment: Alignment.centerLeft,
                                 ),
-                                icon:
-                                const Icon(Icons.shield_outlined, size: 18),
+                                icon: const Icon(Icons.shield_outlined, size: 18),
                                 label: const Text('개인정보 처리방침'),
                               ),
-                              const SizedBox(height: 12),
+
+                              const SizedBox(height: 8), // 버튼 사이 간격
+
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  // 비밀번호 변경 화면으로 이동
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ChangePasswordScreen(),
+                                    ),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40), // 높이 동일하게
+                                  alignment: Alignment.centerLeft,        // 왼쪽 정렬 동일하게
+                                ),
+                                icon: const Icon(Icons.lock_outline, size: 18), // 자물쇠 아이콘
+                                label: const Text('비밀번호 변경'),
+                              ),
+
                               const SizedBox(height: 12),
                               ElevatedButton.icon(
                                 onPressed: () async {
