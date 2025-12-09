@@ -100,6 +100,39 @@ class NewsListService {
     }
   }
 
+  /// 뉴스 추천 목록 조회 (팝업용)
+  /// GET /news/recommendations/popup?count=5
+  Future<List<Map<String, dynamic>>> getRecommendedNews({int count = 5}) async {
+    try {
+      final response = await _dio.get(
+        '/news/recommendations/popup',
+        queryParameters: {'count': count},
+      );
+      print('✅ 추천 뉴스 목록 조회 성공 (${count}개)');
+
+      final data = response.data['data'] as Map<String, dynamic>;
+      final newsList = data['news'] as List<dynamic>;
+
+      return newsList.map((item) => item as Map<String, dynamic>).toList();
+    } on DioException catch (e) {
+      if (e.response != null) {
+        final statusCode = e.response!.statusCode;
+        final errorData = e.response!.data;
+
+        if (statusCode == 400) {
+          throw Exception(errorData['message'] ?? '잘못된 요청입니다');
+        } else if (statusCode == 401) {
+          throw Exception('로그인이 필요합니다');
+        } else if (statusCode == 500) {
+          throw Exception('서버 오류가 발생했습니다');
+        }
+      }
+      throw Exception('네트워크 오류: ${e.message}');
+    } catch (e) {
+      throw Exception('추천 뉴스 조회 실패: $e');
+    }
+  }
+
   /// 뉴스 댓글 목록 조회
   /// GET /news/{newsId}/comments
   Future<Map<String, dynamic>> getNewsComments(int newsId) async {
@@ -110,7 +143,6 @@ class NewsListService {
     } on DioException catch (e) {
       if (e.response != null) {
         final statusCode = e.response!.statusCode;
-        final errorData = e.response!.data;
 
         if (statusCode == 404) {
           throw Exception('뉴스를 찾을 수 없습니다');

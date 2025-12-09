@@ -14,7 +14,6 @@ import '../../models/profile_lists.dart';
 import '../../services/profile_service.dart';
 
 import '../home_screen.dart'; // profileUpdateNotifier 사용
-import 'profile_setup_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -103,7 +102,8 @@ class _ProfileScreenState extends State<ProfileScreen>
         debugPrint('✅ 캐시된 프로필로 빠른 UI 업데이트 완료');
       }
 
-      // 2. API 호출로 최신 데이터 가져오기
+      // 2. API 호출로 최신 데이터 가져오기 (항상 실행)
+      debugPrint('🔵 프로필 API 호출 시작');
       final data = await _profileService.getMyProfile();
 
       // 🔥 캐시 업데이트
@@ -114,35 +114,8 @@ class _ProfileScreenState extends State<ProfileScreen>
       // 3. 데이터 구조 분리
       final apiUserMap = data['user'] ?? {};
       final apiStatsMap = data['stats'] ?? {};
-
-      // ============================================================
-      // [유지] 닉네임이 없으면 프로필 설정 화면으로 이동
-      // ============================================================
       final serverNickname = apiUserMap['nickname'] as String?;
 
-      // 닉네임이 null이거나 비어있다면
-      if (serverNickname == null || serverNickname.trim().isEmpty) {
-        print('⚠️ 닉네임 없음 감지 -> 프로필 설정 화면으로 이동');
-
-        if (!mounted) return;
-
-        // 🔥 캐시 클리어
-        ProfileCache.clearCache();
-
-        // 프로필 설정 화면으로 이동 (결과를 기다림)
-        final result = await Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
-        );
-
-        // 설정이 완료되어 true가 반환되면, 다시 프로필 데이터를 불러옵니다.
-        if (result == true) {
-          print('✅ 프로필 설정 완료 -> 데이터 재로딩');
-          // 재귀적으로 함수를 다시 호출하여 데이터를 새로고침하고 종료
-          _loadProfileData();
-          return;
-        }
-      }
-      // ============================================================
 
       // 4. 게시글, 댓글 데이터는 병렬로 조회 (명시적 타입 지정)
       final MyPostList postData = await _profileService.getMyPosts(page: 1, size: 5);
@@ -177,6 +150,8 @@ class _ProfileScreenState extends State<ProfileScreen>
 
         _isLoading = false; // 로딩 종료
       });
+
+      debugPrint('✅ 프로필 데이터 로드 완료');
     } catch (e) {
       debugPrint('❌ 프로필 로딩 에러: $e');
       if (!mounted) return;

@@ -3,8 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../../services/profile_service.dart';
-import '../home_screen.dart'; // ProfileCache 사용
+import 'category_select_screen.dart';
 
 class ProfileSetupScreen extends StatefulWidget {
   const ProfileSetupScreen({super.key});
@@ -18,14 +17,11 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
   XFile? _image;
   bool _loading = false;
 
-  late final ProfileService _profileService;
-
   bool get _canNext => _nicknameCtrl.text.trim().isNotEmpty;
 
   @override
   void initState() {
     super.initState();
-    _profileService = ProfileService();
     _nicknameCtrl.addListener(() => setState(() {}));
   }
 
@@ -55,33 +51,24 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     setState(() => _loading = true);
 
     try {
-      // ✅ 프로필 설정 API 호출
+      // ✅ 프로필 데이터를 카테고리 선택 화면으로 전달 (API 호출하지 않음)
       final nickname = _nicknameCtrl.text.trim();
-      final result = await _profileService.setupProfile(
-        nickname: nickname,
-        profileImagePath: _image?.path,
-      );
+      final imagePath = _image?.path;
 
       if (!mounted) return;
 
-      // 🔥 프로필 캐시 무효화 (새로운 데이터를 다시 불러오도록)
-      ProfileCache.clearCache();
-
-      // 🔥 전역 프로필 업데이트 알림
-      profileUpdateNotifier.value++;
-
-      // 성공 메시지 표시
-      final message = result['message'] ?? '프로필 설정이 완료되었습니다.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
+      // ✅ 프로필 설정 데이터를 카테고리 선택 화면으로 전달
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => CategorySelectScreen(
+            nickname: nickname,
+            profileImagePath: imagePath,
+          ),
         ),
       );
 
-      // ✅ 프로필 설정 완료 후 이전 화면으로 돌아가기 (true 반환)
-      Navigator.of(context).pop(true);
+      // 카테고리 선택 완료 시 결과를 상위로 전달 (pop은 CategorySelectScreen에서 이미 2번 처리됨)
+      // 따라서 여기서는 아무것도 하지 않음
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
