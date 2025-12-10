@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'dio_service.dart';
 
 class NewsTinderService {
@@ -20,7 +21,7 @@ class NewsTinderService {
         '/shorts',
         queryParameters: queryParameters,
       );
-      print('✅ 쇼츠 피드 조회 성공');
+      debugPrint('✅ 쇼츠 피드 조회 성공');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {
@@ -41,7 +42,7 @@ class NewsTinderService {
         '/shorts/$shortId/interact',
         data: {'interaction_type': interactionType},
       );
-      print('✅ 쇼츠 상호작용 ($interactionType) 성공');
+      debugPrint('✅ 쇼츠 상호작용 ($interactionType) 성공');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {
@@ -59,7 +60,7 @@ class NewsTinderService {
   Future<Map<String, dynamic>> getShortComments(int shortId) async {
     try {
       final response = await _dio.get('/shorts/$shortId/comments');
-      print('✅ 쇼츠 댓글 조회 성공');
+      debugPrint('✅ 쇼츠 댓글 조회 성공');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {
@@ -80,7 +81,7 @@ class NewsTinderService {
         '/shorts/$shortId/comments',
         data: {'content': content},
       );
-      print('✅ 쇼츠 댓글 작성 성공');
+      debugPrint('✅ 쇼츠 댓글 작성 성공');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {

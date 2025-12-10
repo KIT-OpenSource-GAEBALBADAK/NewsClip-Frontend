@@ -42,7 +42,6 @@ class _NewsListScreenState extends State<NewsListScreen> {
   ];
   late String _activeCategory;
 
-  bool _commentsOpen = false;
   NewsItem? _commentsTarget;
 
   bool _isLoading = false;
@@ -212,267 +211,264 @@ class _NewsListScreenState extends State<NewsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 키보드 높이를 Scaffold 외부에서 가져옴
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    // SafeArea 하단 패딩
+    final safeAreaBottom = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
       backgroundColor: Colors.white,
-      resizeToAvoidBottomInset: false, // 키보드가 나타나도 레이아웃 조정 안함
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            _Header(
-              profileImage: _userProfileImage,
-              userName: _userName,
-            ),
-
-            // 🔹 검색창 영역 (위아래 경계선 추가)
-            Column(
+      resizeToAvoidBottomInset: false, // 키보드가 나타나도 전체 레이아웃 조정 안함
+      body: Stack(
+        children: [
+          // 메인 콘텐츠
+          SafeArea(
+            child: Column(
               children: [
-                const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)), // 위쪽 경계선
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12), // 적절한 여백
-                  child: _SearchBar(ctrl: _searchCtrl, onChanged: (_) => _applyFilter()),
+                const SizedBox(height: 8),
+                _Header(
+                  profileImage: _userProfileImage,
+                  userName: _userName,
                 ),
-                const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)), // 아래쪽 경계선
+
+                // 🔹 검색창 영역 (위아래 경계선 추가)
+                Column(
+                  children: [
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: _SearchBar(ctrl: _searchCtrl, onChanged: (_) => _applyFilter()),
+                    ),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFEEEEEE)),
+                  ],
+                ),
+
+                _CategoryRow(
+                  categories: _categories,
+                  active: _activeCategory,
+                  onSelect: (v) {
+                    setState(() => _activeCategory = v);
+                    _loadNews(isRefresh: true);
+                  },
+                ),
+
+                Expanded(
+                  child: _isLoading && _allNews.isEmpty
+                      ? const Center(child: CircularProgressIndicator())
+                      : _hasError && _allNews.isEmpty
+                          ? Center(child: ElevatedButton(onPressed: () => _loadNews(isRefresh: true), child: const Text('다시 시도')))
+                          : RefreshIndicator(
+                              onRefresh: () => _loadNews(isRefresh: true),
+                              child: ListView.builder(
+                                controller: _scrollCtrl,
+                                padding: EdgeInsets.only(
+                                  top: 4,
+                                  bottom: _commentsTarget != null ? 360 : 80, // 댓글창 열려있으면 더 많은 패딩
+                                  left: 16,
+                                  right: 16,
+                                ),
+                                itemCount: _filtered.length + (_isLoadingMore ? 1 : 0),
+                                itemBuilder: (_, i) {
+                                  if (i == _filtered.length) {
+                                    return const Padding(padding: EdgeInsets.all(16.0), child: Center(child: CircularProgressIndicator()));
+                                  }
+                                  final item = _filtered[i];
+                                  return NewsCard(
+                                    item: item,
+                                    liked: _liked.contains(item.id),
+                                    disliked: _disliked.contains(item.id),
+                                    bookmarked: _bookmarked.contains(item.id),
+                                    likeCount: item.likes +
+                                        (_liked.contains(item.id) && !item.isLiked ? 1 :
+                                        (_liked.contains(item.id) == false && item.isLiked ? -1 : 0)),
+                                    dislikeCount: _getDislikeCount(item.id),
+                                    commentCount: item.comments,
+                                    onTap: () {
+                                      Navigator.push(context, MaterialPageRoute(builder: (context) => NewsReaderScreen(newsId: item.id)));
+                                    },
+                                    onToggleLike: () async {
+                                      try {
+                                        final result = await _newsService.interactWithNews(item.id, 'like');
+                                        setState(() {
+                                          final index = _allNews.indexWhere((n) => n.id == item.id);
+                                          if (index != -1) {
+                                            _allNews[index] = _allNews[index].copyWith(
+                                              isLiked: result['isLiked'],
+                                              isDisliked: result['isDisliked'],
+                                              likes: result['likeCount'],
+                                            );
+                                            _dislikeCounts[item.id] = result['dislikeCount'];
+
+                                            if (_allNews[index].isLiked) {
+                                              _liked.add(item.id);
+                                            } else {
+                                              _liked.remove(item.id);
+                                            }
+                                            if (_allNews[index].isDisliked) {
+                                              _disliked.add(item.id);
+                                            } else {
+                                              _disliked.remove(item.id);
+                                            }
+                                            _applyFilter();
+                                            _saveStates();
+                                          }
+                                        });
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('좋아요 처리에 실패했습니다: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    onToggleDislike: () async {
+                                      try {
+                                        final result = await _newsService.interactWithNews(item.id, 'dislike');
+                                        setState(() {
+                                          final index = _allNews.indexWhere((n) => n.id == item.id);
+                                          if (index != -1) {
+                                            _allNews[index] = _allNews[index].copyWith(
+                                              isLiked: result['isLiked'],
+                                              isDisliked: result['isDisliked'],
+                                              likes: result['likeCount'],
+                                            );
+                                            _dislikeCounts[item.id] = result['dislikeCount'];
+
+                                            if (_allNews[index].isLiked) {
+                                              _liked.add(item.id);
+                                            } else {
+                                              _liked.remove(item.id);
+                                            }
+                                            if (_allNews[index].isDisliked) {
+                                              _disliked.add(item.id);
+                                            } else {
+                                              _disliked.remove(item.id);
+                                            }
+                                            _applyFilter();
+                                            _saveStates();
+                                          }
+                                        });
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('싫어요 처리에 실패했습니다: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    onToggleBookmark: () async {
+                                      try {
+                                        final isBookmarked = await _newsService.toggleBookmark(item.id);
+                                        setState(() {
+                                          if (isBookmarked) {
+                                            _bookmarked.add(item.id);
+                                          } else {
+                                            _bookmarked.remove(item.id);
+                                          }
+                                          _saveStates();
+                                        });
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text(isBookmarked ? '북마크에 추가되었습니다.' : '북마크에서 제거되었습니다.'),
+                                              duration: const Duration(seconds: 2),
+                                            ),
+                                          );
+                                        }
+                                      } catch (e) {
+                                        if (context.mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('북마크 처리에 실패했습니다: $e'),
+                                              backgroundColor: Colors.red,
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    },
+                                    onOpenComments: () {
+                                      setState(() {
+                                        _commentsTarget = item;
+                                      });
+                                    },
+                                    onShare: () async {
+                                      final text = '${item.title}\n${item.summary}';
+                                      await Clipboard.setData(ClipboardData(text: text));
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('복사 완료')));
+                                      }
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                ),
               ],
             ),
+          ),
 
-            _CategoryRow(
-              categories: _categories,
-              active: _activeCategory,
-              onSelect: (v) {
-                setState(() => _activeCategory = v);
-                _loadNews(isRefresh: true);
-              },
-            ),
-
-            Expanded(
-              child: _isLoading && _allNews.isEmpty
-                  ? const Center(child: CircularProgressIndicator())
-                  : _hasError && _allNews.isEmpty
-                  ? Center(child: ElevatedButton(onPressed: () => _loadNews(isRefresh: true), child: const Text('다시 시도')))
-                  : Stack(
-                children: [
-                  RefreshIndicator(
-                    onRefresh: () => _loadNews(isRefresh: true),
-                    child: ListView.builder(
-                      controller: _scrollCtrl,
-                      padding: const EdgeInsets.only(top: 4, bottom: 80, left: 16, right: 16),
-                      itemCount: _filtered.length + (_isLoadingMore ? 1 : 0),
-                      itemBuilder: (_, i) {
-                        if (i == _filtered.length) {
-                          return const Padding(padding: EdgeInsets.all(16.0), child: Center(child: CircularProgressIndicator()));
-                        }
-                        final item = _filtered[i];
-                        return NewsCard(
-                          item: item,
-                          liked: _liked.contains(item.id),
-                          disliked: _disliked.contains(item.id),
-                          bookmarked: _bookmarked.contains(item.id),
-                          likeCount: item.likes +
-                              (_liked.contains(item.id) && !item.isLiked ? 1 :
-                              (_liked.contains(item.id) == false && item.isLiked ? -1 : 0)),
-                          dislikeCount: _getDislikeCount(item.id),
-                          commentCount: item.comments,
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => NewsReaderScreen(newsId: item.id)));
-                          },
-                          onToggleLike: () async {
-                            try {
-                              final result = await _newsService.interactWithNews(item.id, 'like');
-                              setState(() {
-                                final index = _allNews.indexWhere((n) => n.id == item.id);
-                                if (index != -1) {
-                                  _allNews[index] = _allNews[index].copyWith(
-                                    isLiked: result['isLiked'],
-                                    isDisliked: result['isDisliked'],
-                                    likes: result['likeCount'],
-                                  );
-                                  _dislikeCounts[item.id] = result['dislikeCount'];
-
-                                  if (_allNews[index].isLiked) {
-                                    _liked.add(item.id);
-                                  } else {
-                                    _liked.remove(item.id);
-                                  }
-                                  if (_allNews[index].isDisliked) {
-                                    _disliked.add(item.id);
-                                  } else {
-                                    _disliked.remove(item.id);
-                                  }
-                                  _applyFilter();
-                                  _saveStates(); // 🔥 상태 저장
-                                }
-                              });
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('좋아요 처리에 실패했습니다: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          onToggleDislike: () async {
-                            try {
-                              final result = await _newsService.interactWithNews(item.id, 'dislike');
-                              setState(() {
-                                final index = _allNews.indexWhere((n) => n.id == item.id);
-                                if (index != -1) {
-                                  _allNews[index] = _allNews[index].copyWith(
-                                    isLiked: result['isLiked'],
-                                    isDisliked: result['isDisliked'],
-                                    likes: result['likeCount'],
-                                  );
-                                  _dislikeCounts[item.id] = result['dislikeCount'];
-
-                                  if (_allNews[index].isLiked) {
-                                    _liked.add(item.id);
-                                  } else {
-                                    _liked.remove(item.id);
-                                  }
-                                  if (_allNews[index].isDisliked) {
-                                    _disliked.add(item.id);
-                                  } else {
-                                    _disliked.remove(item.id);
-                                  }
-                                  _applyFilter();
-                                  _saveStates(); // 🔥 상태 저장
-                                }
-                              });
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('싫어요 처리에 실패했습니다: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          onToggleBookmark: () async {
-                            try {
-                              final isBookmarked = await _newsService.toggleBookmark(item.id);
-                              setState(() {
-                                if (isBookmarked) {
-                                  _bookmarked.add(item.id);
-                                } else {
-                                  _bookmarked.remove(item.id);
-                                }
-                                _saveStates(); // 🔥 상태 저장
-                              });
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(isBookmarked ? '북마크에 추가되었습니다.' : '북마크에서 제거되었습니다.'),
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('북마크 처리에 실패했습니다: $e'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          onOpenComments: () {
-                            setState(() {
-                              _commentsTarget = item;
-                              _commentsOpen = true;
-                            });
-                          },
-                          onShare: () async {
-                            final text = '${item.title}\n${item.summary}';
-                            await Clipboard.setData(ClipboardData(text: text));
-                            if (context.mounted) {
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('복사 완료')));
-                            }
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  // 댓글 조회 모달 (완전히 고정 - 절대 위치 사용)
-                  if (_commentsTarget != null)
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        // Stack의 전체 높이 기준으로 하단 340px 위치에 고정
-                        final topPosition = constraints.maxHeight - 340;
-
-                        return Positioned(
-                          left: 0,
-                          right: 0,
-                          top: topPosition, // 절대 위치로 고정
-                          height: 340,
-                          child: _CommentsModal(
-                            newsId: _commentsTarget!.id,
-                            newsTitle: _commentsTarget!.title,
-                            onClose: () => setState(() {
-                              _commentsOpen = false;
-                              _commentsTarget = null;
-                            }),
-                          ),
-                        );
-                      },
-                    ),
-                  // 댓글 입력창 (키보드 위로 이동 - 별도 Builder로 키보드 감지)
-                  if (_commentsTarget != null)
-                    Builder(
-                      builder: (outerContext) {
-                        // 원본 context에서 키보드 높이 가져오기
-                        final keyboardHeight = MediaQuery.of(outerContext).viewInsets.bottom;
-                        return Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: keyboardHeight, // 키보드 높이만큼 위로
-                          child: _CommentInputBar(
-                            newsId: _commentsTarget!.id,
-                            onCommentAdded: () {
-                              // 댓글 작성 후 모달 새로고침 및 댓글 개수 업데이트
-                              setState(() {
-                                // _allNews와 _filtered 모두에서 댓글 개수 증가
-                                final allIndex = _allNews.indexWhere((n) => n.id == _commentsTarget!.id);
-                                if (allIndex != -1) {
-                                  _allNews[allIndex] = _allNews[allIndex].copyWith(
-                                    comments: _allNews[allIndex].comments + 1,
-                                  );
-                                }
-
-                                final filteredIndex = _filtered.indexWhere((n) => n.id == _commentsTarget!.id);
-                                if (filteredIndex != -1) {
-                                  _filtered[filteredIndex] = _filtered[filteredIndex].copyWith(
-                                    comments: _filtered[filteredIndex].comments + 1,
-                                  );
-                                }
-
-                                // _commentsTarget을 다시 설정하여 모달 리빌드
-                                final currentTarget = _commentsTarget;
-                                _commentsTarget = null;
-                                Future.delayed(const Duration(milliseconds: 50), () {
-                                  if (mounted) {
-                                    setState(() {
-                                      _commentsTarget = currentTarget;
-                                    });
-                                  }
-                                });
-                              });
-                            },
-                          ),
-                        );
-                      },
-                    ),
-                ],
+          // 댓글 조회 모달 (Scaffold 레벨에서 절대 위치로 고정)
+          if (_commentsTarget != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              // SafeArea 하단 + 입력창 높이(60) 위에 고정
+              bottom: safeAreaBottom + 60,
+              height: 280,
+              child: _CommentsModal(
+                newsId: _commentsTarget!.id,
+                newsTitle: _commentsTarget!.title,
+                onClose: () => setState(() {
+                  _commentsTarget = null;
+                }),
               ),
             ),
-          ],
-        ),
+
+          // 댓글 입력창 (키보드 위로 이동)
+          if (_commentsTarget != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              // 키보드가 있으면 키보드 위로, 없으면 SafeArea 하단에
+              bottom: keyboardHeight > 0 ? keyboardHeight : safeAreaBottom,
+              child: _CommentInputBar(
+                newsId: _commentsTarget!.id,
+                onCommentAdded: () {
+                  setState(() {
+                    final allIndex = _allNews.indexWhere((n) => n.id == _commentsTarget!.id);
+                    if (allIndex != -1) {
+                      _allNews[allIndex] = _allNews[allIndex].copyWith(
+                        comments: _allNews[allIndex].comments + 1,
+                      );
+                    }
+
+                    final filteredIndex = _filtered.indexWhere((n) => n.id == _commentsTarget!.id);
+                    if (filteredIndex != -1) {
+                      _filtered[filteredIndex] = _filtered[filteredIndex].copyWith(
+                        comments: _filtered[filteredIndex].comments + 1,
+                      );
+                    }
+
+                    final currentTarget = _commentsTarget;
+                    _commentsTarget = null;
+                    Future.delayed(const Duration(milliseconds: 50), () {
+                      if (mounted) {
+                        setState(() {
+                          _commentsTarget = currentTarget;
+                        });
+                      }
+                    });
+                  });
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

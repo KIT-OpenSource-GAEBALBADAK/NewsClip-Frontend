@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'dio_service.dart';
 
 class NewsListService {
@@ -21,7 +22,7 @@ class NewsListService {
           'size': size,
         },
       );
-      print('✅ 실제 API에서 뉴스 목록 조회 성공');
+      debugPrint('✅ 실제 API에서 뉴스 목록 조회 성공');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {
@@ -47,7 +48,7 @@ class NewsListService {
   Future<Map<String, dynamic>> getNewsDetail(int newsId) async {
     try {
       final response = await _dio.get('/news/$newsId');
-      print('✅ 뉴스 상세 정보 조회 성공: $newsId');
+      debugPrint('✅ 뉴스 상세 정보 조회 성공: $newsId');
       // API 리스폰스의 data 객체를 그대로 반환
       return response.data['data'] as Map<String, dynamic>;
     } on DioException catch (e) {
@@ -65,7 +66,7 @@ class NewsListService {
   Future<bool> toggleBookmark(int newsId) async {
     try {
       final response = await _dio.post('/news/$newsId/bookmark');
-      print('✅ 북마크 토글 성공: $newsId');
+      debugPrint('✅ 북마크 토글 성공: $newsId');
       return response.data['data']['is_bookmarked'] as bool;
     } on DioException catch (e) {
       if (e.response != null) {
@@ -87,7 +88,7 @@ class NewsListService {
         '/news/$newsId/interact',
         data: {'interaction_type': interactionType},
       );
-      print('✅ 뉴스 상호작용 ($interactionType) 성공: $newsId');
+      debugPrint('✅ 뉴스 상호작용 ($interactionType) 성공: $newsId');
       return response.data['data'] as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {
@@ -108,7 +109,7 @@ class NewsListService {
         '/news/recommendations/popup',
         queryParameters: {'count': count},
       );
-      print('✅ 추천 뉴스 목록 조회 성공 (${count}개)');
+      debugPrint('✅ 추천 뉴스 목록 조회 성공 (${count}개)');
 
       final data = response.data['data'] as Map<String, dynamic>;
       final newsList = data['news'] as List<dynamic>;
@@ -138,7 +139,7 @@ class NewsListService {
   Future<Map<String, dynamic>> getNewsComments(int newsId) async {
     try {
       final response = await _dio.get('/news/$newsId/comments');
-      print('✅ 댓글 목록 조회 성공: $newsId');
+      debugPrint('✅ 댓글 목록 조회 성공: $newsId');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {
@@ -164,7 +165,7 @@ class NewsListService {
         '/news/$newsId/comments',
         data: {'content': content},
       );
-      print('✅ 댓글 작성 성공: $newsId');
+      debugPrint('✅ 댓글 작성 성공: $newsId');
       return response.data as Map<String, dynamic>;
     } on DioException catch (e) {
       if (e.response != null) {

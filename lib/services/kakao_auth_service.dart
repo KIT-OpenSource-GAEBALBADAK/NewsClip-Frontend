@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:webview_flutter/webview_flutter.dart';
@@ -29,21 +30,21 @@ class KakaoAuthService {
       );
 
       if (authCode == null) {
-        print('⚠️ 사용자가 로그인을 취소했습니다.');
+        debugPrint('⚠️ 사용자가 로그인을 취소했습니다.');
         return false;
       }
 
       // ✅ 인증 코드로 카카오 토큰 발급
       final tokenResponse = await AuthApi.instance.issueAccessToken(authCode: authCode);
       await TokenManagerProvider.instance.manager.setToken(tokenResponse);
-      print('✅ 카카오 토큰 발급 성공: ${tokenResponse.accessToken}');
+      debugPrint('✅ 카카오 토큰 발급 성공: ${tokenResponse.accessToken}');
 
       // ✅ 백엔드 소셜 로그인 API 호출
       final authService = AuthService();
       final success = await authService.socialLogin('kakao', tokenResponse.accessToken);
 
       if (!success) {
-        print('❌ 백엔드 소셜 로그인 실패');
+        debugPrint('❌ 백엔드 소셜 로그인 실패');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -55,7 +56,7 @@ class KakaoAuthService {
         return false;
       }
 
-      print('✅ 백엔드 소셜 로그인 성공');
+      debugPrint('✅ 백엔드 소셜 로그인 성공');
 
       // ✅ 홈화면으로 이동 (모든 이전 화면 제거)
       if (context.mounted) {
@@ -67,7 +68,7 @@ class KakaoAuthService {
 
       return true;
     } catch (error) {
-      print('❌ 카카오 로그인 실패: $error');
+      debugPrint('❌ 카카오 로그인 실패: $error');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -140,4 +141,3 @@ class _KakaoWebViewScreenState extends State<_KakaoWebViewScreen> {
     );
   }
 }
-

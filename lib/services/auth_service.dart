@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dio_service.dart';
 
@@ -25,16 +26,16 @@ class AuthService {
   /// POST /auth/login
   Future<bool> login(String email, String password) async {
     try {
-      print('🔵 로그인 요청 시작');
-      print('🔵 URL: ${_dio.options.baseUrl}/auth/login');
+      debugPrint('🔵 로그인 요청 시작');
+      debugPrint('🔵 URL: ${_dio.options.baseUrl}/auth/login');
 
       final response = await _dio.post('/auth/login', data: {
         'username': email,
         'password': password,
       });
 
-      print('✅ 응답 코드: ${response.statusCode}');
-      print('✅ 응답 데이터: ${response.data}');
+      debugPrint('✅ 응답 코드: ${response.statusCode}');
+      debugPrint('✅ 응답 데이터: ${response.data}');
 
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         final data = response.data['data'];
@@ -46,9 +47,9 @@ class AuthService {
       }
       throw Exception('이메일 또는 비밀번호가 일치하지 않습니다.');
     } on DioException catch (e) {
-      print('❌ DioException 타입: ${e.type}');
-      print('❌ 응답 코드: ${e.response?.statusCode}');
-      print('❌ 응답 데이터: ${e.response?.data}');
+      debugPrint('❌ DioException 타입: ${e.type}');
+      debugPrint('❌ 응답 코드: ${e.response?.statusCode}');
+      debugPrint('❌ 응답 데이터: ${e.response?.data}');
 
       // API 응답에서 메시지 추출
       String errorMessage = '이메일 또는 비밀번호가 일치하지 않습니다.';
@@ -72,7 +73,7 @@ class AuthService {
 
       throw Exception(errorMessage);
     } catch (e) {
-      print('❌ 일반 예외: $e');
+      debugPrint('❌ 일반 예외: $e');
       if (e is Exception) rethrow;
       throw Exception('이메일 또는 비밀번호가 일치하지 않습니다.');
     }
@@ -82,16 +83,16 @@ class AuthService {
   /// POST /auth/social
   Future<bool> socialLogin(String provider, String token) async {
     try {
-      print('🔵 소셜 로그인 요청 시작');
-      print('🔵 Provider: $provider');
+      debugPrint('🔵 소셜 로그인 요청 시작');
+      debugPrint('🔵 Provider: $provider');
 
       final response = await _dio.post('/auth/social', data: {
         'provider': provider,
         'token': token,
       });
 
-      print('✅ 응답 코드: ${response.statusCode}');
-      print('✅ 응답 데이터: ${response.data}');
+      debugPrint('✅ 응답 코드: ${response.statusCode}');
+      debugPrint('✅ 응답 데이터: ${response.data}');
 
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         final data = response.data['data'];
@@ -103,12 +104,12 @@ class AuthService {
       }
       throw Exception('소셜 로그인에 실패했습니다.');
     } on DioException catch (e) {
-      print('❌ DioException 타입: ${e.type}');
-      print('❌ 응답 코드: ${e.response?.statusCode}');
-      print('❌ 응답 데이터: ${e.response?.data}');
+      debugPrint('❌ DioException 타입: ${e.type}');
+      debugPrint('❌ 응답 코드: ${e.response?.statusCode}');
+      debugPrint('❌ 응답 데이터: ${e.response?.data}');
       throw Exception('소셜 로그인 중 오류가 발생했습니다.');
     } catch (e) {
-      print('❌ 일반 예외: $e');
+      debugPrint('❌ 일반 예외: $e');
       throw Exception('소셜 로그인에 실패했습니다.');
     }
   }
@@ -140,7 +141,14 @@ class AuthService {
     // 🔥 뉴스 추천 팝업 플래그도 초기화 (다음 로그인 시 다시 표시되도록)
     await prefs.remove('has_seen_news_recommendation_popup');
     await prefs.remove('should_show_news_popup');
-    print('🔴 로그아웃: 모든 플래그 초기화 완료');
+    // 🔥 뉴스 좋아요/싫어요/북마크 로컬 캐시 초기화 (계정 간 데이터 혼동 방지)
+    await prefs.remove('liked_news');
+    await prefs.remove('disliked_news');
+    await prefs.remove('bookmarked_news');
+    // 🔥 캐시된 프로필 정보도 초기화
+    await prefs.remove('cached_profile_nickname');
+    await prefs.remove('cached_profile_image');
+    debugPrint('🔴 로그아웃: 모든 플래그 및 캐시 초기화 완료');
   }
 
 
@@ -155,25 +163,25 @@ class AuthService {
   /// type: "reset" - 비밀번호 찾기용
   Future<Map<String, dynamic>> sendPasswordResetCode(String email) async {
     try {
-      print('🔵 비밀번호 찾기 인증번호 전송 요청');
-      print('🔵 email: $email');
+      debugPrint('🔵 비밀번호 찾기 인증번호 전송 요청');
+      debugPrint('🔵 email: $email');
 
       final response = await _dio.post('/auth/email/send-code', data: {
         'email': email,
         'type': 'reset',
       });
 
-      print('✅ 응답 코드: ${response.statusCode}');
-      print('✅ 응답 데이터: ${response.data}');
+      debugPrint('✅ 응답 코드: ${response.statusCode}');
+      debugPrint('✅ 응답 데이터: ${response.data}');
 
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         return response.data as Map<String, dynamic>;
       }
       throw Exception('인증번호 전송에 실패했습니다.');
     } on DioException catch (e) {
-      print('❌ DioException 타입: ${e.type}');
-      print('❌ 응답 코드: ${e.response?.statusCode}');
-      print('❌ 응답 데이터: ${e.response?.data}');
+      debugPrint('❌ DioException 타입: ${e.type}');
+      debugPrint('❌ 응답 코드: ${e.response?.statusCode}');
+      debugPrint('❌ 응답 데이터: ${e.response?.data}');
 
       if (e.response?.statusCode == 404) {
         throw Exception('가입되지 않은 이메일입니다.');
@@ -184,7 +192,7 @@ class AuthService {
       }
       throw Exception('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
     } catch (e) {
-      print('❌ 일반 예외: $e');
+      debugPrint('❌ 일반 예외: $e');
       rethrow;
     }
   }
@@ -195,9 +203,9 @@ class AuthService {
   /// 성공 시 reset_token 반환
   Future<String> verifyPasswordResetCode(String email, String code) async {
     try {
-      print('🔵 비밀번호 찾기 인증번호 검증 요청');
-      print('🔵 email: $email');
-      print('🔵 code: $code');
+      debugPrint('🔵 비밀번호 찾기 인증번호 검증 요청');
+      debugPrint('🔵 email: $email');
+      debugPrint('🔵 code: $code');
 
       final response = await _dio.post('/auth/email/verify-code', data: {
         'email': email,
@@ -205,8 +213,8 @@ class AuthService {
         'type': 'reset',
       });
 
-      print('✅ 응답 코드: ${response.statusCode}');
-      print('✅ 응답 데이터: ${response.data}');
+      debugPrint('✅ 응답 코드: ${response.statusCode}');
+      debugPrint('✅ 응답 데이터: ${response.data}');
 
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         final resetToken = response.data['data']['reset_token'] as String?;
@@ -217,9 +225,9 @@ class AuthService {
       }
       throw Exception('인증번호 검증에 실패했습니다.');
     } on DioException catch (e) {
-      print('❌ DioException 타입: ${e.type}');
-      print('❌ 응답 코드: ${e.response?.statusCode}');
-      print('❌ 응답 데이터: ${e.response?.data}');
+      debugPrint('❌ DioException 타입: ${e.type}');
+      debugPrint('❌ 응답 코드: ${e.response?.statusCode}');
+      debugPrint('❌ 응답 데이터: ${e.response?.data}');
 
       if (e.response?.statusCode == 400) {
         throw Exception('인증번호가 일치하지 않습니다.');
@@ -229,7 +237,7 @@ class AuthService {
       }
       throw Exception('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
     } catch (e) {
-      print('❌ 일반 예외: $e');
+      debugPrint('❌ 일반 예외: $e');
       rethrow;
     }
   }
@@ -242,8 +250,8 @@ class AuthService {
     required String newPassword,
   }) async {
     try {
-      print('🔵 비밀번호 재설정 요청');
-      print('🔵 email: $email');
+      debugPrint('🔵 비밀번호 재설정 요청');
+      debugPrint('🔵 email: $email');
 
       final response = await _dio.post('/auth/password/reset', data: {
         'email': email,
@@ -251,17 +259,17 @@ class AuthService {
         'new_password': newPassword,
       });
 
-      print('✅ 응답 코드: ${response.statusCode}');
-      print('✅ 응답 데이터: ${response.data}');
+      debugPrint('✅ 응답 코드: ${response.statusCode}');
+      debugPrint('✅ 응답 데이터: ${response.data}');
 
       if (response.statusCode == 200 && response.data['status'] == 'success') {
         return true;
       }
       throw Exception('비밀번호 재설정에 실패했습니다.');
     } on DioException catch (e) {
-      print('❌ DioException 타입: ${e.type}');
-      print('❌ 응답 코드: ${e.response?.statusCode}');
-      print('❌ 응답 데이터: ${e.response?.data}');
+      debugPrint('❌ DioException 타입: ${e.type}');
+      debugPrint('❌ 응답 코드: ${e.response?.statusCode}');
+      debugPrint('❌ 응답 데이터: ${e.response?.data}');
 
       if (e.response?.statusCode == 400) {
         final message = e.response?.data['message'] ?? '잘못된 요청입니다.';
@@ -272,7 +280,7 @@ class AuthService {
       }
       throw Exception('네트워크 오류가 발생했습니다. 다시 시도해주세요.');
     } catch (e) {
-      print('❌ 일반 예외: $e');
+      debugPrint('❌ 일반 예외: $e');
       rethrow;
     }
   }
@@ -309,4 +317,3 @@ Future<bool> resetPassword({
       resetToken: resetToken,
       newPassword: newPassword,
     );
-

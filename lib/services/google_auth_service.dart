@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'auth_service.dart';
@@ -19,17 +20,17 @@ class GoogleAuthService {
   /// 구글 로그인 후 ID Token을 백엔드로 전송하여 JWT 토큰을 받아 저장
   Future<bool> signInWithGoogle(BuildContext context) async {
     try {
-      print('🔵 구글 로그인 시작');
+      debugPrint('🔵 구글 로그인 시작');
 
       // ✅ 구글 로그인 실행
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
 
       if (googleUser == null) {
-        print('⚠️ 사용자가 구글 로그인을 취소했습니다.');
+        debugPrint('⚠️ 사용자가 구글 로그인을 취소했습니다.');
         return false;
       }
 
-      print('✅ 구글 계정 선택 완료: ${googleUser.email}');
+      debugPrint('✅ 구글 계정 선택 완료: ${googleUser.email}');
 
       // ✅ 인증 정보 가져오기
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -38,7 +39,7 @@ class GoogleAuthService {
       final String? idToken = googleAuth.idToken;
 
       if (idToken == null) {
-        print('❌ ID Token을 받지 못했습니다.');
+        debugPrint('❌ ID Token을 받지 못했습니다.');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -50,15 +51,15 @@ class GoogleAuthService {
         return false;
       }
 
-      print('✅ 구글 ID Token 발급 성공');
-      print('🔑 ID Token (앞 50자): ${idToken.substring(0, idToken.length > 50 ? 50 : idToken.length)}...');
+      debugPrint('✅ 구글 ID Token 발급 성공');
+      debugPrint('🔑 ID Token (앞 50자): ${idToken.substring(0, idToken.length > 50 ? 50 : idToken.length)}...');
 
       // ✅ 백엔드 소셜 로그인 API 호출
       final authService = AuthService();
       final success = await authService.socialLogin('google', idToken);
 
       if (!success) {
-        print('❌ 백엔드 소셜 로그인 실패');
+        debugPrint('❌ 백엔드 소셜 로그인 실패');
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -70,7 +71,7 @@ class GoogleAuthService {
         return false;
       }
 
-      print('✅ 백엔드 소셜 로그인 성공');
+      debugPrint('✅ 백엔드 소셜 로그인 성공');
 
       // ✅ 홈화면으로 이동 (모든 이전 화면 제거)
       if (context.mounted) {
@@ -82,7 +83,7 @@ class GoogleAuthService {
 
       return true;
     } catch (error) {
-      print('❌ 구글 로그인 실패: $error');
+      debugPrint('❌ 구글 로그인 실패: $error');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -101,9 +102,9 @@ class GoogleAuthService {
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
-      print('✅ 구글 계정 캐시 삭제 완료');
+      debugPrint('✅ 구글 계정 캐시 삭제 완료');
     } catch (error) {
-      print('❌ 구글 로그아웃 실패: $error');
+      debugPrint('❌ 구글 로그아웃 실패: $error');
     }
   }
 
@@ -117,10 +118,9 @@ class GoogleAuthService {
   Future<void> disconnect() async {
     try {
       await _googleSignIn.disconnect();
-      print('✅ 구글 계정 연결 해제 완료');
+      debugPrint('✅ 구글 계정 연결 해제 완료');
     } catch (error) {
-      print('❌ 구글 연결 해제 실패: $error');
+      debugPrint('❌ 구글 계정 연결 해제 실패: $error');
     }
   }
 }
-
