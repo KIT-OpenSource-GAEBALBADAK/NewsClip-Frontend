@@ -1,60 +1,1465 @@
-// components/ProfileScreen.tsx 변환
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../providers/app_provider.dart';
-import '../../core/constants/app_colors.dart';
 
-class ProfileScreen extends StatelessWidget {
-  const ProfileScreen({Key? key}) : super(key: key);
+import '../../providers/app_provider.dart';
+import '../bookmarks/bookmarks_screen.dart';
+import '../../services/auth_service.dart';
+import '../community/community_screen.dart';
+import '../../services/community_service.dart';
+import '../login/login_screen.dart';
+
+import '../../models/profile_lists.dart';
+
+// [수정] 방금 만드신 ProfileService import
+import '../../services/profile_service.dart';
+
+import '../home_screen.dart'; // profileUpdateNotifier 사용
+
+import 'change_password_screen.dart';
+import 'profile_change_screen.dart';
+import 'privacy_policy_screen.dart';
+
+class ProfileScreen extends StatefulWidget {
+  const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('프로필'),
+  State<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
+  // [추가] 내가 쓴 게시글 목록을 저장할 변수
+  List<MyPost> _myPosts = [];
+
+  // [추가] 내가 쓴 댓글 목록을 저장할 변수
+  List<MyComment> _myComments = [];
+
+  // [수정] 서비스 인스턴스 및 로딩 상태 변수 추가
+  final ProfileService _profileService = ProfileService();
+
+  // [추가] 커뮤니티 서비스
+  final CommunityService _communityService = CommunityService();
+
+  bool _isLoading = true; // 로딩 중인지 여부
+
+  // [수정] 초기값을 빈 값으로 설정
+  String name = '';
+  String bio = '';
+  String avatarUrl = '';
+  // 기본 이미지 URL
+  final String defaultAvatar =
+      'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&h=150&fit=crop&crop=face';
+
+  bool isExpert = false;
+  String joinDate = '';
+
+  int postsCount = 0;
+  int commentsCount = 0;
+  int likes = 0;
+  int followers = 0;
+
+  bool notificationsEnabled = true;
+  bool soundEnabled = true;
+  bool isEditing = false;
+  late TextEditingController _bioController;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+    _bioController = TextEditingController();
+
+    // [수정] 화면 시작 시 데이터 로드 함수 실행
+    _loadProfileData();
+  }
+
+  // [수정] API를 통해 프로필 정보를 가져오는 함수
+  Future<void> _loadProfileData() async {
+    try {
+      // 🔥 1. 캐시된 프로필이 있으면 우선 사용 (빠른 UI 업데이트)
+      if (ProfileCache.hasValidCache) {
+        final cachedData = ProfileCache.getCache()!;
+        final userMap = cachedData['user'] ?? {};
+        final statsMap = cachedData['stats'] ?? {};
+
+        // 캐시된 데이터로 먼저 UI 업데이트
+        setState(() {
+          name = userMap['nickname'] ?? '알 수 없음';
+
+          final serverImage = userMap['profile_image'];
+          if (serverImage != null && serverImage.toString().isNotEmpty) {
+            avatarUrl = serverImage;
+          } else {
+            avatarUrl = defaultAvatar;
+          }
+
+          postsCount = statsMap['post_count'] ?? 0;
+          commentsCount = statsMap['comment_count'] ?? 0;
+          likes = statsMap['total_received_likes'] ?? 0;
+
+          bio = userMap['bio'] ?? '아직 자기소개가 없습니다.';
+          _bioController.text = bio;
+        });
+
+        debugPrint('✅ 캐시된 프로필로 빠른 UI 업데이트 완료');
+      }
+
+      // 2. API 호출로 최신 데이터 가져오기 (항상 실행)
+      debugPrint('🔵 프로필 API 호출 시작');
+      final data = await _profileService.getMyProfile();
+
+      // 🔥 캐시 업데이트
+      ProfileCache.setCache(data);
+
+      print('📌 [DEBUG] 서버에서 받은 프로필 데이터 전체: $data');
+
+      // 3. 데이터 구조 분리
+      final apiUserMap = data['user'] ?? {};
+      final apiStatsMap = data['stats'] ?? {};
+      final serverNickname = apiUserMap['nickname'] as String?;
+
+
+      // 4. 게시글, 댓글 데이터는 병렬로 조회 (명시적 타입 지정)
+      final MyPostList postData = await _profileService.getMyPosts(page: 1, size: 5);
+      final MyCommentList commentData = await _profileService.getMyComments(page: 1, size: 5);
+
+      if (!mounted) return;
+
+      setState(() {
+        // 1. 닉네임
+        name = serverNickname ?? '알 수 없음';
+
+        // 2. 프로필 이미지
+        final serverImage = apiUserMap['profile_image'];
+        if (serverImage != null && serverImage.toString().isNotEmpty) {
+          avatarUrl = serverImage;
+        } else {
+          avatarUrl = defaultAvatar;
+        }
+
+        // 3. 통계
+        postsCount = apiStatsMap['post_count'] ?? 0;
+        commentsCount = apiStatsMap['comment_count'] ?? 0;
+        likes = apiStatsMap['total_received_likes'] ?? 0;
+
+
+        // 4. 자기소개 필요 X
+        bio = apiUserMap['bio'] ?? data['bio'] ?? '아직 자기소개가 없습니다.';
+        _bioController.text = bio;
+
+        // 5. 게시글 및 댓글 리스트
+        _myPosts = postData.posts;
+        _myComments = commentData.comments;
+
+        _isLoading = false; // 로딩 종료
+      });
+
+      debugPrint('✅ 프로필 데이터 로드 완료');
+    } catch (e) {
+      debugPrint('❌ 프로필 로딩 에러: $e');
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        name = '오류 발생';
+        bio = '정보를 불러오지 못했습니다.';
+        avatarUrl = defaultAvatar;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('프로필 로딩 실패: $e')),
+      );
+    }
+  }
+
+  // [수정] 로그 위치 변경 (에러 나기 전에 ID 확인)
+  Future<void> _deletePost(String postId) async {
+    try {
+      print('🔍 [DEBUG] 삭제 시도할 게시글 ID: $postId');
+
+      if (postId == '0' || postId == '') {
+        throw Exception('게시글 ID가 유효하지 않습니다.');
+      }
+
+      // API 호출
+      await _communityService.deletePost(postId.toString());
+
+      print('✅ 게시글 삭제 성공 (서버 응답 완료)');
+
+      if (!mounted) return;
+      setState(() {
+        _myPosts.removeWhere((post) => post.postId == postId);
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('게시글이 삭제되었습니다.')),
+      );
+    } catch (e) {
+      print('❌ 삭제 실패 로그: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('삭제 실패: $e')),
+      );
+    }
+  }
+
+  // 게시글 삭제 확인 다이얼로그
+  void _showDeleteConfirmation(String postId) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('게시글 삭제'),
+        content: const Text('정말 게시글을 삭제하시겠습니까?'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('취소', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
             onPressed: () {
-              // TODO: 설정 화면
+              Navigator.of(ctx).pop();
+              _deletePost(postId);
             },
+            child: const Text('확인', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
-      body: Consumer<AppProvider>(
-        builder: (context, provider, child) {
-          final user = provider.user;
-          
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+    );
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _bioController.dispose();
+    super.dispose();
+  }
+
+  String _formatDate(String? dateString) {
+    if (dateString == null || dateString.isEmpty) return '';
+    final date = DateTime.tryParse(dateString);
+    if (date == null) return '';
+    final now = DateTime.now();
+    final diffInHours =
+    (now.difference(date).inMilliseconds / (1000 * 60 * 60)).floor();
+
+    if (diffInHours < 1) return '방금 전';
+    if (diffInHours < 24) return '${diffInHours}시간 전';
+
+    final diffInDays = (diffInHours / 24).floor();
+    if (diffInDays == 1) return '어제';
+    if (diffInDays < 7) return '${diffInDays}일 전';
+    if (diffInDays < 14) return '1주 전';
+    return '${(diffInDays / 7).floor()}주 전';
+  }
+
+  void _openBookmarkedNews() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const BookmarksScreen(),
+      ),
+    );
+  }
+
+  // [추가] 커뮤니티(게시글 목록) 화면으로 이동하는 함수
+  void _openCommunity() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const CommunityScreen(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // [수정] 로딩 중이면 로딩 인디케이터 표시
+    if (_isLoading) {
+      return Container(
+        color: Theme.of(context).colorScheme.background,
+        child: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final app = context.watch<AppProvider>();
+
+    return Container(
+      color: Theme.of(context).colorScheme.background,
+      padding: const EdgeInsets.only(top: 50),
+      child: Column(
+        children: [
+          // ===== Header =====
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.background,
+              border: Border(
+                bottom: BorderSide(
+                  color: Theme.of(context).dividerColor.withOpacity(0.2),
+                ),
+              ),
+            ),
+            child: Row(
               children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: AppColors.primaryStart,
-                  child: const Icon(Icons.person, size: 48, color: Colors.white),
+                Icon(Icons.person_outline,
+                    color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                const Text(
+                  '프로필',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 16),
-                Text(
-                  user?.name ?? '사용자',
-                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  user?.email ?? '',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton(
+                const Spacer(), // 빈 공간을 채워 아이콘을 오른쪽 끝으로 밈
+                IconButton(
+                  padding: EdgeInsets.zero, // 버튼 패딩 제거 (선택사항)
+                  constraints: const BoxConstraints(), // 버튼 크기 최소화 (선택사항)
+                  icon: Icon(
+                    Icons.refresh,
+                    color: Theme.of(context).colorScheme.primary, // 기존 아이콘 색상과 통일
+                  ),
                   onPressed: () {
-                    provider.logout();
+                    // 로딩 상태를 true로 변경하여 화면에 로딩 표시
+                    setState(() {
+                      _isLoading = true;
+                    });
+                    // 데이터 다시 불러오기
+                    _loadProfileData();
                   },
-                  child: const Text('로그아웃'),
                 ),
               ],
             ),
-          );
-        },
+          ),
+
+          // ===== Tabs =====
+          Container(
+            padding:
+            const EdgeInsets.only(left: 16, right: 16, top: 8, bottom: 4),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: TabBar(
+                dividerColor: Colors.transparent,
+                controller: _tabController,
+                labelColor: Theme.of(context).colorScheme.onPrimary,
+                unselectedLabelColor:
+                Theme.of(context).textTheme.bodyMedium?.color,
+                indicator: BoxDecoration(
+                  borderRadius: BorderRadius.circular(24),
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                labelStyle:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                unselectedLabelStyle:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                indicatorSize: TabBarIndicatorSize.tab,
+                tabs: const [
+                  Tab(text: '프로필'),
+                  Tab(text: '활동'),
+                  Tab(text: '설정'),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Divider(
+            height: 1, // 공간 높이
+            thickness: 1, // 선 두께
+            color: Theme.of(context).dividerColor.withOpacity(0.2), // 연한 회색
+          ),
+
+          // ===== Tab contents =====
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // ─── 프로필 탭 ───
+                SingleChildScrollView(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    children: [
+                      // 프로필 카드
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 20, 16, 20),
+                          child: Column(
+                            children: [
+                              // [수정] 이미지 로드 부분 안전하게 처리
+                              CircleAvatar(
+                                radius: 40,
+                                backgroundImage: avatarUrl.startsWith('http')
+                                    ? NetworkImage(avatarUrl)
+                                    : NetworkImage(defaultAvatar),
+                                onBackgroundImageError: (_, __) {
+                                  // 이미지 로드 실패 시 처리 (필요시 구현)
+                                },
+                              ),
+                              const SizedBox(height: 16),
+                              Column(
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        name,
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      if (isExpert) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withOpacity(0.08),
+                                            borderRadius:
+                                            BorderRadius.circular(999),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.shield,
+                                                  size: 14,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '전문가',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: Theme.of(context)
+                                                      .colorScheme
+                                                      .primary,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        )
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 8),
+                                  // bio + edit 필요 X
+                                  /*
+                                  isEditing
+                                      ? Column(
+                                    children: [
+                                      TextField(
+                                        controller: _bioController,
+                                        maxLines: 3,
+                                        maxLength: 150,
+                                        decoration: InputDecoration(
+                                          isDense: true,
+                                          contentPadding:
+                                          const EdgeInsets.all(8),
+                                          border: OutlineInputBorder(
+                                            borderRadius:
+                                            BorderRadius.circular(8),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 8),
+                                      Row(
+                                        mainAxisAlignment:
+                                        MainAxisAlignment.center,
+                                        children: [
+                                          ElevatedButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                bio = _bioController.text;
+                                                isEditing = false;
+                                              });
+                                              // TODO: 서버에 bio 수정 요청
+                                            },
+                                            child: const Text('저장'),
+                                          ),
+                                          const SizedBox(width: 8),
+                                          OutlinedButton(
+                                            onPressed: () {
+                                              setState(() {
+                                                _bioController.text = bio;
+                                                isEditing = false;
+                                              });
+                                            },
+                                            child: const Text('취소'),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  )
+                                      : Row(
+                                    mainAxisAlignment:
+                                    MainAxisAlignment.center,
+                                    crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                    children: [
+                                      SizedBox(
+                                        width: 260,
+                                        child: Text(
+                                          bio,
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.color,
+                                          ),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.edit,
+                                          size: 16,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            isEditing = true;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                   */
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    joinDate,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.color,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // 활동 통계 카드
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '활동 통계',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceAround,
+                                children: [
+                                  _StatCard(
+                                    icon: Icons.chat_bubble_outline,
+                                    label: '작성글',
+                                    value: postsCount,
+                                    color: Colors.blue,
+                                  ),
+                                  _StatCard(
+                                    icon: Icons.mode_comment_outlined,
+                                    label: '댓글',
+                                    value: commentsCount,
+                                    color: Colors.green,
+                                  ),
+                                  _StatCard(
+                                    icon: Icons.favorite_border,
+                                    label: '좋아요',
+                                    value: likes,
+                                    color: Colors.red,
+                                  ),
+                                  /*
+                                  _StatCard(
+                                    icon: Icons.person_outline,
+                                    label: '팔로워',
+                                    value: followers,
+                                    color: Colors.purple,
+                                  ),
+                                  */
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ─── 활동 탭 ───
+                SingleChildScrollView(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Column(
+                    children: [
+                      // 1. 내가 쓴 글 카드
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 헤더
+                            Padding(
+                              padding:
+                              const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.chat_bubble_outline,
+                                      size: 18),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    '내가 쓴 글',
+                                    style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .primary
+                                          .withOpacity(0.08),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      '$postsCount',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Divider(height: 1),
+
+                            // 내용
+                            Padding(
+                              padding:
+                              const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                              child: _myPosts.isEmpty
+                              // [기준] 게시글 없을 때
+                                  ? const Padding(
+                                padding:
+                                EdgeInsets.symmetric(vertical: 20.0),
+                                child: Center(
+                                  child: Text(
+                                    '작성한 게시글이 없습니다.',
+                                    style: TextStyle(
+                                        fontSize: 13, color: Colors.grey),
+                                  ),
+                                ),
+                              )
+                                  : Container(
+                                height: 220,
+                                child: Scrollbar(
+                                  thumbVisibility: false,
+                                  child: SingleChildScrollView(
+                                    physics:
+                                    const ClampingScrollPhysics(),
+                                    child: Column(
+                                      children: [
+                                        ..._myPosts.map((post) {
+                                          return Container(
+                                            margin: const EdgeInsets
+                                                .symmetric(vertical: 4),
+                                            padding:
+                                            const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                                  .withOpacity(0.02),
+                                              borderRadius:
+                                              BorderRadius.circular(
+                                                  16),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                    CrossAxisAlignment
+                                                        .start,
+                                                    children: [
+                                                      Text(
+                                                        post.title,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                        TextOverflow
+                                                            .ellipsis,
+                                                        style:
+                                                        const TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                          FontWeight
+                                                              .w500,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          height: 4),
+                                                      Row(
+                                                        children: [
+                                                          Row(
+                                                            children: [
+                                                              const Icon(
+                                                                  Icons
+                                                                      .favorite_border,
+                                                                  size:
+                                                                  14),
+                                                              const SizedBox(
+                                                                  width:
+                                                                  2),
+                                                              Text(
+                                                                '${post.likeCount}',
+                                                                style:
+                                                                TextStyle(
+                                                                  fontSize:
+                                                                  12,
+                                                                  color: Colors
+                                                                      .grey
+                                                                      .shade600,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 12),
+                                                          Row(
+                                                            children: [
+                                                              const Icon(
+                                                                  Icons
+                                                                      .mode_comment_outlined,
+                                                                  size:
+                                                                  14),
+                                                              const SizedBox(
+                                                                  width:
+                                                                  2),
+                                                              Text(
+                                                                '${post.commentCount}',
+                                                                style:
+                                                                TextStyle(
+                                                                  fontSize:
+                                                                  12,
+                                                                  color: Colors
+                                                                      .grey
+                                                                      .shade600,
+                                                                ),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 12),
+                                                          Text(
+                                                            _formatDate(post
+                                                                .createdAt
+                                                                .toString()),
+                                                            style:
+                                                            TextStyle(
+                                                              fontSize:
+                                                              12,
+                                                              color: Colors
+                                                                  .grey
+                                                                  .shade600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child: PopupMenuButton<
+                                                      String>(
+                                                    padding:
+                                                    EdgeInsets.zero,
+                                                    icon: Icon(
+                                                        Icons.more_vert,
+                                                        size: 18,
+                                                        color: Colors.grey
+                                                            .shade500),
+                                                    onSelected: (value) {
+                                                      if (value ==
+                                                          'delete') {
+                                                        _showDeleteConfirmation(
+                                                            post.postId
+                                                                .toString());
+                                                      }
+                                                    },
+                                                    itemBuilder: (BuildContext
+                                                    context) =>
+                                                    [
+                                                      const PopupMenuItem<
+                                                          String>(
+                                                        value: 'delete',
+                                                        child: Text(
+                                                            '게시글 삭제',
+                                                            style: TextStyle(
+                                                                fontSize:
+                                                                13)),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+
+                      // 2. 내가 쓴 댓글 카드
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            InkWell(
+                              borderRadius: const BorderRadius.vertical(
+                                  top: Radius.circular(24)),
+                              child: Padding(
+                                padding:
+                                const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                                child: Row(
+                                  mainAxisAlignment:
+                                  MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const Icon(Icons.mode_comment_outlined,
+                                            size: 18),
+                                        const SizedBox(width: 6),
+                                        const Text(
+                                          '내가 쓴 댓글',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 8, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .primary
+                                                .withOpacity(0.08),
+                                            borderRadius:
+                                            BorderRadius.circular(999),
+                                          ),
+                                          child: Text(
+                                            '$commentsCount',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            const Divider(height: 1),
+                            Padding(
+                              padding:
+                              const EdgeInsets.fromLTRB(16, 24, 16, 16),
+                              child: _myComments.isNotEmpty
+                                  ? Container(
+                                height: 220,
+                                child: Scrollbar(
+                                  thumbVisibility: false,
+                                  child: SingleChildScrollView(
+                                    physics:
+                                    const ClampingScrollPhysics(),
+                                    child: Column(
+                                      children: [
+                                        ..._myComments.map((comment) {
+
+                                          // [디버깅] 실제 서버에서 들어오는 값이 무엇인지 로그로 확인해보세요!
+                                          // print('🔍 댓글 타겟 타입 확인: ${comment.targetType}');
+
+                                          return Container(
+                                            margin: const EdgeInsets
+                                                .symmetric(vertical: 4),
+                                            padding:
+                                            const EdgeInsets.all(12),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                                  .withOpacity(0.02),
+                                              borderRadius:
+                                              BorderRadius.circular(
+                                                  16),
+                                            ),
+                                            child: Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                    CrossAxisAlignment
+                                                        .start,
+                                                    children: [
+                                                      Text(
+                                                        comment.content,
+                                                        maxLines: 1,
+                                                        overflow:
+                                                        TextOverflow
+                                                            .ellipsis,
+                                                        style:
+                                                        const TextStyle(
+                                                          fontSize: 14,
+                                                          fontWeight:
+                                                          FontWeight
+                                                              .w500,
+                                                        ),
+                                                      ),
+                                                      const SizedBox(
+                                                          height: 4),
+                                                      Row(
+                                                        children: [
+                                                          Expanded(
+                                                            child: Row(
+                                                              children: [
+                                                                Container(
+                                                                  padding: const EdgeInsets
+                                                                      .symmetric(
+                                                                    horizontal:
+                                                                    6,
+                                                                    vertical:
+                                                                    2,
+                                                                  ),
+                                                                  decoration:
+                                                                  BoxDecoration(
+                                                                    borderRadius:
+                                                                    BorderRadius.circular(999),
+                                                                    border:
+                                                                    Border.all(
+                                                                      color:
+                                                                      Colors.grey.shade300,
+                                                                    ),
+                                                                  ),
+                                                                  child:
+                                                                  Text(
+                                                                    comment.targetType == 'news' ? '뉴스' : '게시글',
+                                                                    style:
+                                                                    const TextStyle(
+                                                                      fontSize: 10,
+                                                                      color: Colors.grey,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                                const SizedBox(
+                                                                    width:
+                                                                    8),
+                                                                Flexible(
+                                                                  child:
+                                                                  Text(
+                                                                    comment
+                                                                        .targetTitle,
+                                                                    maxLines:
+                                                                    1,
+                                                                    overflow:
+                                                                    TextOverflow.ellipsis,
+                                                                    style:
+                                                                    TextStyle(
+                                                                      fontSize: 12,
+                                                                      color: Colors.grey.shade600,
+                                                                    ),
+                                                                  ),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                          ),
+                                                          const SizedBox(
+                                                              width: 8),
+                                                          Text(
+                                                            _formatDate(comment
+                                                                .createdAt
+                                                                .toString()),
+                                                            style:
+                                                            TextStyle(
+                                                              fontSize:
+                                                              12,
+                                                              color: Colors
+                                                                  .grey
+                                                                  .shade600,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        }).toList(),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              )
+                              // [수정] 댓글 없을 때 스타일을 '게시글 없음'과 동일하게 변경
+                                  : const Padding(
+                                padding:
+                                EdgeInsets.symmetric(vertical: 20.0),
+                                child: Center(
+                                  child: Text(
+                                    '작성한 댓글이 없습니다.',
+                                    style: TextStyle(
+                                        fontSize: 13, color: Colors.grey),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // ─── 설정 탭 ───
+                SingleChildScrollView(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    children: [
+                      // 알림 설정
+                      /*
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '알림 설정',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              // 푸시 알림
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: Colors.blue.shade100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          notificationsEnabled
+                                              ? Icons.volume_up
+                                              : Icons.volume_off,
+                                          size: 18,
+                                          color: Colors.blue.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            '푸시 알림',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '댓글, 좋아요 알림 받기',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Switch(
+                                    value: notificationsEnabled,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        notificationsEnabled = v;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                              const Divider(height: 24),
+                              // 소리 알림
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: Colors.green.shade100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          soundEnabled
+                                              ? Icons.volume_up
+                                              : Icons.volume_off,
+                                          size: 18,
+                                          color: Colors.green.shade600,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            '소리 알림',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '알림음 재생',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Switch(
+                                    value: soundEnabled,
+                                    onChanged: (v) {
+                                      setState(() {
+                                        soundEnabled = v;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // 화면 설정 (다크 모드)
+
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '화면 설정',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Row(
+                                mainAxisAlignment:
+                                MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: Colors.yellow.shade100,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Icon(
+                                          app.isDarkMode
+                                              ? Icons.dark_mode
+                                              : Icons.light_mode,
+                                          size: 18,
+                                          color: Colors.yellow.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Column(
+                                        crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                        children: [
+                                          const Text(
+                                            '다크 모드',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '어두운 테마 사용',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  Switch(
+                                    value: app.isDarkMode,
+                                    onChanged: (_) {
+                                      app.toggleDarkMode();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                       */
+
+                      const SizedBox(height: 16),
+
+                      // 계정 관리
+                      Card(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '계정 관리',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: () async {
+                                  // [수정] ProfileSetupScreen으로 이동
+                                  // await를 써서 갔다 올 때까지 기다림
+                                  await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ProfileChangeScreen(),
+                                    ),
+                                  );
+
+                                  // [추가] 갔다 온 후 프로필 정보를 다시 불러와서 화면 갱신
+                                  _loadProfileData();
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                  alignment: Alignment.centerLeft,
+                                ),
+                                icon: const Icon(Icons.settings, size: 18),
+                                label: const Text('계정 정보 수정'),
+                              ),
+                              const SizedBox(height: 8),
+
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  // 개인정보 처리방침 화면으로 이동
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const PrivacyPolicyScreen(),
+                                    ),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40),
+                                  alignment: Alignment.centerLeft,
+                                ),
+                                icon: const Icon(Icons.shield_outlined, size: 18),
+                                label: const Text('개인정보 처리방침'),
+                              ),
+
+                              const SizedBox(height: 8), // 버튼 사이 간격
+
+                              OutlinedButton.icon(
+                                onPressed: () {
+                                  // 비밀번호 변경 화면으로 이동
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ChangePasswordScreen(),
+                                    ),
+                                  );
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(40), // 높이 동일하게
+                                  alignment: Alignment.centerLeft,        // 왼쪽 정렬 동일하게
+                                ),
+                                icon: const Icon(Icons.lock_outline, size: 18), // 자물쇠 아이콘
+                                label: const Text('비밀번호 변경'),
+                              ),
+
+                              const SizedBox(height: 12),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  try {
+                                    // 1. 로그아웃 (토큰 삭제)
+                                    await AuthService().logout();
+                                    print('✅ 로그아웃 완료 (토큰 삭제됨)');
+
+                                    // 2. 로그인 화면으로 이동 (스택 비우기)
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context)
+                                          .showSnackBar(
+                                        const SnackBar(
+                                            content: Text('로그아웃 되었습니다.')),
+                                      );
+                                      Navigator.of(context).pushAndRemoveUntil(
+                                        MaterialPageRoute(
+                                          builder: (_) => const LoginScreen(),
+                                        ),
+                                            (route) => false, // 이전 화면들 싹 지우기
+                                      );
+                                    }
+                                  } catch (e) {
+                                    print('❌ 로그아웃 실패: $e');
+                                  }
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  minimumSize: const Size.fromHeight(44),
+                                  backgroundColor: Colors.red,
+                                  foregroundColor: Colors.white,
+                                  alignment: Alignment.centerLeft,
+                                ),
+                                icon: const Icon(Icons.logout, size: 18),
+                                label: const Text('로그아웃'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '$value',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: Colors.grey.shade600,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -2,11 +2,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 
 import 'app.dart';
 import 'providers/app_provider.dart';
 
-void main() {
+import 'package:kakao_flutter_sdk_common/kakao_flutter_sdk_common.dart';
+
+// 전역 Navigator Key (어디서든 화면 이동 가능하도록)
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+void main() async {
   // Flutter 바인딩 초기화
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -24,6 +30,9 @@ void main() {
     DeviceOrientation.portraitDown,
   ]);
 
+  KakaoSdk.init(
+    nativeAppKey: '25c7ef75b2b00474bc1603a180884255', // TODO: 카카오 네이티브 앱 키로 교체
+  );
   runApp(
     MultiProvider(
       providers: [

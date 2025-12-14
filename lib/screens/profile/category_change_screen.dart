@@ -1,0 +1,261 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../home_screen.dart';
+import '../../services/profile_service.dart';
+
+class CategoryChangeScreen extends StatefulWidget {
+  // 🔥 수정: 이미 앞단에서 프로필 설정을 마쳤으므로 닉네임/이미지 파라미터 제거
+  const CategoryChangeScreen({super.key});
+
+  @override
+  State<CategoryChangeScreen> createState() => _CategoryChangeScreenState();
+}
+
+class _CategoryChangeScreenState extends State<CategoryChangeScreen> {
+  final List<Map<String, String>> categories = [
+    {"icon": "🏛️", "label": "정치"},
+    {"icon": "💰", "label": "경제"},
+    {"icon": "🎭", "label": "문화"},
+    {"icon": "🌍", "label": "환경"},
+    {"icon": "💻", "label": "기술"},
+    {"icon": "⚽", "label": "스포츠"},
+    {"icon": "✨", "label": "라이프스타일"},
+    {"icon": "💪", "label": "건강"},
+    {"icon": "📚", "label": "교육"},
+    {"icon": "🍜", "label": "음식"},
+    {"icon": "✈️", "label": "여행"},
+    {"icon": "👗", "label": "패션"},
+  ];
+
+  final Set<int> _selectedIndices = {};
+  final ProfileService _profileService = ProfileService();
+  bool _loading = false;
+
+  bool get _canSubmit => _selectedIndices.length == 3 && !_loading;
+
+  void _toggleCategory(int index) {
+    setState(() {
+      if (_selectedIndices.contains(index)) {
+        _selectedIndices.remove(index);
+      } else {
+        if (_selectedIndices.length < 3) {
+          _selectedIndices.add(index);
+        }
+      }
+    });
+  }
+
+  Future<void> _goToHome() async {
+    if (!_canSubmit) return;
+
+    setState(() => _loading = true);
+
+    try {
+      // 선택된 카테고리 정보 추출
+      final selectedCategories = _selectedIndices
+          .map((i) => categories[i]["label"]!)
+          .toList();
+
+      debugPrint('🔵 선택된 카테고리: $selectedCategories');
+
+      // 🔥 [수정됨] 프로필 설정(setupProfile) API 호출 제거함.
+      // 오직 카테고리 업데이트만 수행
+
+      // 1️⃣ 선호 카테고리 설정 API 호출
+      debugPrint('🔵 선호 카테고리 설정 API 호출 시작');
+      await _profileService.updatePreferredCategories(
+        categories: selectedCategories,
+      );
+      debugPrint('✅ 선호 카테고리 설정 완료');
+
+      if (!mounted) return;
+
+      debugPrint('========================================================');
+      debugPrint('✅ [API Response] 200 OK - 업데이트 성공');
+      debugPrint('📥 서버 메시지: "선호 카테고리가 업데이트되었습니다."');
+      debugPrint('========================================================');
+
+      // 🔥 프로필 캐시 무효화 (서버에 저장된 최신 카테고리 정보를 다시 불러오기 위함)
+      ProfileCache.clearCache();
+
+      // 2️⃣ 프로필 재로드 및 캐시 업데이트
+      debugPrint('🔵 프로필 재로드 시작');
+      await _profileService.getMyProfile();
+      debugPrint('✅ 프로필 재로드 완료 (캐시 업데이트됨)');
+
+      // 🔥 전역 프로필 업데이트 알림
+      profileUpdateNotifier.value++;
+
+      debugPrint('✅ 홈 화면으로 이동');
+
+      if (!mounted) return;
+
+      // 3️⃣ 홈 화면으로 이동
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+            (route) => false,
+      );
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('프로필 정보 변경이 완료되었습니다! 🎉'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('❌ 에러 발생: $e');
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 40),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                "어떤 소식을 들려드릴까요?",
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: categories.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 12),
+                itemBuilder: (context, index) {
+                  final isSelected = _selectedIndices.contains(index);
+                  return _buildCategoryTile(
+                    icon: categories[index]["icon"]!,
+                    label: categories[index]["label"]!,
+                    isSelected: isSelected,
+                    onTap: () => _toggleCategory(index),
+                  );
+                },
+              ),
+            ),
+            _buildBottomButton(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCategoryTile({
+    required String icon,
+    required String label,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        height: 75,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected ? const Color(0xFF8B5CF6) : Colors.grey.shade300,
+            width: isSelected ? 2 : 1,
+          ),
+          color: isSelected ? const Color(0xFFF3E8FF) : Colors.white,
+        ),
+        child: Row(
+          children: [
+            const SizedBox(width: 20),
+            Text(icon, style: const TextStyle(fontSize: 30)),
+            const SizedBox(width: 20),
+            Text(
+              label,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            const Spacer(),
+            Container(
+              width: 26,
+              height: 26,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected ? const Color(0xFF8B5CF6) : Colors.white,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF8B5CF6) : Colors.grey.shade400,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? const Icon(Icons.check, color: Colors.white, size: 18)
+                  : null,
+            ),
+            const SizedBox(width: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomButton() {
+    final remaining = 3 - _selectedIndices.length;
+    final buttonText = _canSubmit
+        ? "완료"
+        : "관심사를 ${remaining}개 더 선택해주세요";
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: InkWell(
+        onTap: _canSubmit ? _goToHome : null,
+        borderRadius: BorderRadius.circular(20),
+        child: Opacity(
+          opacity: _canSubmit ? 1.0 : 0.5,
+          child: Container(
+            height: 65,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFCC9DF5), Color(0xFFFF9AD5)],
+              ),
+            ),
+            child: Center(
+              child: _loading
+                  ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2.5,
+                ),
+              )
+                  : Text(
+                buttonText,
+                style: const TextStyle(
+                  fontSize: 18,
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
