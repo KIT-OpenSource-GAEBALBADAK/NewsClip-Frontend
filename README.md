@@ -19,64 +19,51 @@
 
 ---
 
-## 📂 디렉토리 구조 (구조와 파일명은 개발 진행중 달라질 수 있음)
+## 📂 디렉토리 구조
 ### 하위 파일명들은 예시 입니다.
 ```
-lib/
-├── app.dart                        # 앱 초기 설정 및 MaterialApp 구성
-├── main.dart                       # 앱 진입점 (runApp)
+📦 lib
+├── 📂 core                      # 앱 전반에서 사용되는 공통 리소스
+│   ├── 📂 constants             # 상수 (색상, 치수, 텍스트 스타일)
+│   ├── 📂 theme                 # 테마 설정 (다크/라이트 모드)
+│   └── 📂 utils                 # 유틸리티 (유효성 검사 등)
 │
-├── core/                           # 공통 리소스 및 환경 관련 코드
-│   ├── constants/                  # 전역 상수 (API URL, 색상 등)
-│   ├── theme/                      # 라이트 / 다크 테마
-│   └── utils/                      # 공통 유틸리티 (포맷터 등)
+├── 📂 models                    # 데이터 모델 (DTO)
+│   ├── 📄 user.dart
+│   ├── 📄 news_item.dart
+│   ├── 📄 community.dart
+│   ├── 📄 comment.dart
+│   └── ... (기타 데이터 모델)
 │
-├── models/                         # 데이터 모델 (DTO)
-│   ├── news_article.dart
-│   ├── notification.dart
-│   ├── user.dart
-│   └── comment.dart
+├── 📂 providers                 # 상태 관리 (Provider)
+│   └── 📄 app_provider.dart     # 전역 앱 상태 관리
 │
-├── providers/                      # 상태관리 (Provider)
-│   ├── app_provider.dart
-│   ├── auth_provider.dart
-│   ├── news_provider.dart
-│   ├── community_provider.dart
-│   ├── bookmark_provider.dart
-│   └── profile_provider.dart
+├── 📂 screens                   # UI 화면 (기능별 분류)
+│   ├── 📂 bookmarks             # 북마크 화면
+│   ├── 📂 community             # 커뮤니티 (생성, 목록, 시트)
+│   ├── 📂 login                 # 인증 (로그인, 회원가입, 비밀번호 찾기)
+│   ├── 📂 news                  # 뉴스 (목록, 리더, 틴더 UI)
+│   ├── 📂 notifications         # 알림 화면
+│   ├── 📂 profile               # 프로필 (설정, 수정, 카테고리 변경)
+│   └── 📄 home_screen.dart      # 메인 홈 화면
 │
-├── screens/                        # UI (기능별 화면)
-│   ├── home_screen.dart
-│   ├── login/
-│   │   ├── email_login_screen.dart
-│   │   ├── forgot_password_screen.dart
-│   │   ├── login_screen.dart
-│   │   └── register_screen.dart
-│   ├── news/
-│   ├── community/
-│   ├── bookmarks/
-│   ├── notifications/
-│   └── profile/
-│       └── profile_screen.dart
+├── 📂 services                  # API 통신 및 비즈니스 로직
+│   ├── 📄 dio_service.dart      # HTTP 클라이언트 설정
+│   ├── 📄 auth_service.dart     # 일반 인증 로직
+│   ├── 📄 google_auth_service.dart
+│   ├── 📄 kakao_auth_service.dart
+│   ├── 📄 news_list_service.dart
+│   ├── 📄 news_tinder_service.dart
+│   └── ... (기능별 서비스)
 │
-├── services/                       # API 통신 (Dio 기반)
-│   ├── auth_service.dart
-│   ├── user_service.dart
-│   ├── google_auth_service.dart
-│   ├── kakao_auth_service.dart
-│   ├── community_service.dart
-│   ├── profile_service.dart
-│   └── notification_service.dart
+├── 📂 widgets                   # 재사용 가능한 공통 위젯
+│   ├── 📂 common
+│   │   ├── 📄 bottom_navigation.dart
+│   │   └── 📄 news_recommend_popup.dart
+│   └── ...
 │
-└── widgets/                        # 공통 위젯
-    ├── common/
-    │   ├── bottom_navigation.dart
-    │   ├── custom_appbar.dart
-    │   ├── loading_indicator.dart
-    │   └── empty_state.dart
-    ├── news/
-    ├── community/
-    └── profile/
+├── 📄 app.dart                  # 앱 초기 설정 (MaterialApp)
+└── 📄 main.dart                 # 앱 진입점 (Entry Point)
 ```
 
 ---
@@ -113,3 +100,21 @@ Database (PostgreSQL)
 | 주요 연동 기능 | 로그인 / 뉴스 조회 / 커뮤니티 / 북마크 / 알림 |
 
 ---
+
+## 🚀 프로젝트 실행법
+
+### 1. Prerequisites
+이 프로젝트를 실행하려면 [Flutter SDK](https://flutter.dev/docs/get-started/install)가 설치되어 있어야 합니다.
+
+### 2. Installation
+프로젝트를 클론하고 의존성 패키지를 설치합니다.
+
+```bash
+# Clone the repository
+git clone https://github.com/KIT-OpenSource-GAEBALBADAK/NewsClip-Frontend.git
+
+# Navigate to project folder
+cd NewsClip-Frontend
+
+# Install dependencies (필수!)
+flutter pub get
