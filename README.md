@@ -15,7 +15,7 @@
 | Flutter SDK | 3.35.3 |
 | Dart SDK | 3.9.2 |
 | IDE | VS Code / Android Studio |
-| Target | Android / iOS / Web |
+| Target | Android / iOS |
 
 ---
 
