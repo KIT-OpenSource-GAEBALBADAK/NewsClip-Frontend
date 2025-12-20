@@ -22,48 +22,105 @@
 ## 📂 디렉토리 구조
 ### 하위 파일명들은 예시 입니다.
 ```
-📦 lib
-├── 📂 core                      # 앱 전반에서 사용되는 공통 리소스
-│   ├── 📂 constants             # 상수 (색상, 치수, 텍스트 스타일)
-│   ├── 📂 theme                 # 테마 설정 (다크/라이트 모드)
-│   └── 📂 utils                 # 유틸리티 (유효성 검사 등)
+📦 NewsClip-Frontend
+├── .dart_tool/                # 다트 빌드 도구 및 캐시
+├── .idea/                     # 개발 환경(IDE) 설정 파일
+├── android/                   # 안드로이드 플랫폼 소스 코드
+├── assets/                    # 이미지, 폰트 등 정적 리소스
+├── build/                     # 프로젝트 빌드 결과물
+├── ios/                       # iOS 플랫폼 소스 코드
+├── linux/                     # 리눅스 플랫폼 소스 코드
+├── macos/                     # macOS 플랫폼 소스 코드
+├── web/                       # 웹 플랫폼 소스 코드
+├── windows/                   # 윈도우 플랫폼 소스 코드
 │
-├── 📂 models                    # 데이터 모델 (DTO)
-│   ├── 📄 user.dart
-│   ├── 📄 news_item.dart
-│   ├── 📄 community.dart
-│   ├── 📄 comment.dart
-│   └── ... (기타 데이터 모델)
+├── lib/                       # 🚀 핵심 소스 코드
+│   ├── core/                  # 앱 공통 리소스 및 설정
+│   │   ├── constants/         # 공통 상수 (색상, 치수, 텍스트 스타일)
+│   │   │   ├── app_colors.dart
+│   │   │   ├── app_dimensions.dart
+│   │   │   └── app_text_styles.dart
+│   │   ├── theme/             # 다크/라이트 모드 테마 설정
+│   │   │   ├── dark_theme.dart
+│   │   │   └── light_theme.dart
+│   │   └── utils/             # 범용 유틸리티 (유효성 검사 등)
+│   │       └── validators.dart
+│   │
+│   ├── models/                # 데이터 구조 정의 (DTO)
+│   │   ├── bookmark.dart
+│   │   ├── comment.dart
+│   │   ├── community.dart
+│   │   ├── news_card.dart
+│   │   ├── news_item.dart
+│   │   ├── notification.dart
+│   │   ├── profile_lists.dart
+│   │   └── user.dart
+│   │
+│   ├── providers/             # 전역 상태 관리 (Provider)
+│   │   └── app_provider.dart
+│   │
+│   ├── screens/               # 화면 UI 구성
+│   │   ├── bookmarks/         # 북마크 목록 화면
+│   │   │   └── bookmarks_screen.dart
+│   │   ├── community/         # 커뮤니티(글쓰기, 목록, 시트) 화면
+│   │   │   ├── community_create_screen.dart
+│   │   │   ├── community_screen.dart
+│   │   │   └── community_sheet.dart
+│   │   ├── login/             # 인증(로그인, 가입, 비번찾기) 관련 화면
+│   │   │   ├── email_login_screen.dart
+│   │   │   ├── forgot_password_screen.dart
+│   │   │   ├── forgot_password_verify_code_screen.dart
+│   │   │   ├── login_screen.dart
+│   │   │   ├── register_screen.dart
+│   │   │   └── reset_password_screen.dart
+│   │   ├── news/              # 뉴스 관련 화면 (목록, 상세, 틴더UI)
+│   │   │   ├── news_list_screen.dart
+│   │   │   ├── news_reader_screen.dart
+│   │   │   └── news_tinder_screen.dart
+│   │   ├── notifications/     # 알림 목록 화면
+│   │   │   └── notifications_screen.dart
+│   │   ├── profile/           # 사용자 프로필 및 개인 설정 화면
+│   │   │   ├── category_change_screen.dart
+│   │   │   ├── category_select_screen.dart
+│   │   │   ├── change_password_screen.dart
+│   │   │   ├── privacy_policy_screen.dart
+│   │   │   ├── profile_change_screen.dart
+│   │   │   ├── profile_screen.dart
+│   │   │   └── profile_setup_screen.dart
+│   │   └── home_screen.dart    # 메인 홈 화면
+│   │
+│   ├── services/              # API 통신 및 외부 서비스 로직
+│   │   ├── auth_service.dart
+│   │   ├── bookmark_service.dart
+│   │   ├── community_service.dart
+│   │   ├── dio_service.dart    # HTTP 통신 설정
+│   │   ├── google_auth_service.dart
+│   │   ├── kakao_auth_service.dart
+│   │   ├── news_list_service.dart
+│   │   ├── news_tinder_service.dart
+│   │   ├── profile_service.dart
+│   │   └── user_service.dart
+│   │
+│   ├── widgets/               # 재사용 가능한 UI 컴포넌트
+│   │   ├── common/            # 공통 위젯 (하단 바, 팝업 등)
+│   │   │   ├── bottom_navigation.dart
+│   │   │   └── news_recommend_popup.dart
+│   │   └── app.dart            # 최상위 MaterialApp 위젯
+│   │
+│   └── main.dart               # 앱 진입점
 │
-├── 📂 providers                 # 상태 관리 (Provider)
-│   └── 📄 app_provider.dart     # 전역 앱 상태 관리
-│
-├── 📂 screens                   # UI 화면 (기능별 분류)
-│   ├── 📂 bookmarks             # 북마크 화면
-│   ├── 📂 community             # 커뮤니티 (생성, 목록, 시트)
-│   ├── 📂 login                 # 인증 (로그인, 회원가입, 비밀번호 찾기)
-│   ├── 📂 news                  # 뉴스 (목록, 리더, 틴더 UI)
-│   ├── 📂 notifications         # 알림 화면
-│   ├── 📂 profile               # 프로필 (설정, 수정, 카테고리 변경)
-│   └── 📄 home_screen.dart      # 메인 홈 화면
-│
-├── 📂 services                  # API 통신 및 비즈니스 로직
-│   ├── 📄 dio_service.dart      # HTTP 클라이언트 설정
-│   ├── 📄 auth_service.dart     # 일반 인증 로직
-│   ├── 📄 google_auth_service.dart
-│   ├── 📄 kakao_auth_service.dart
-│   ├── 📄 news_list_service.dart
-│   ├── 📄 news_tinder_service.dart
-│   └── ... (기능별 서비스)
-│
-├── 📂 widgets                   # 재사용 가능한 공통 위젯
-│   ├── 📂 common
-│   │   ├── 📄 bottom_navigation.dart
-│   │   └── 📄 news_recommend_popup.dart
-│   └── ...
-│
-├── 📄 app.dart                  # 앱 초기 설정 (MaterialApp)
-└── 📄 main.dart                 # 앱 진입점 (Entry Point)
+├── .flutter-plugins-dependencies
+├── .gitignore                 # Git 관리 제외 설정
+├── .metadata                  # 플러그인 메타데이터
+├── analysis_options.yaml      # 코드 분석 및 Lint 규칙
+├── devtools_options.yaml      # 개발 도구 설정
+├── FILE_MAPPING.md            # 파일 매핑 설명 문서
+├── flutter_launcher_icons.yaml # 앱 아이콘 생성 설정
+├── pubspec.lock               # 패키지 버전 고정 정보
+├── pubspec.yaml               # 프로젝트 패키지 및 환경 설정
+├── QUICKSTART.md              # 프로젝트 빠른 실행 가이드
+├── README.md                  # 프로젝트 메인 설명 파일
+└── routes.json                # 라우트 설정 정보
 ```
 
 ---
@@ -101,20 +158,29 @@ Database (PostgreSQL)
 
 ---
 
-## 🚀 프로젝트 실행법
+## 🧠 플러터 실행 방법
 
-### 1. Prerequisites
-이 프로젝트를 실행하려면 [Flutter SDK](https://flutter.dev/docs/get-started/install)가 설치되어 있어야 합니다.
-
-### 2. Installation
-프로젝트를 클론하고 의존성 패키지를 설치합니다.
-
+### 1️⃣ 의존성 설치
 ```bash
-# Clone the repository
-git clone https://github.com/KIT-OpenSource-GAEBALBADAK/NewsClip-Frontend.git
-
-# Navigate to project folder
-cd NewsClip-Frontend
-
-# Install dependencies (필수!)
 flutter pub get
+```
+
+### 2️⃣ 플러터 실행
+```bash
+flutter run
+```
+
+---
+
+## 🧩 주요 기능
+
+| 모듈 | 기능 |
+|------|------|
+| **Login** | 회원가입, 로그인, 비밀번호 찾기 및 변경, 소셜 간편 로그인 |
+| **NewsList** | 뉴스 본문 조회, 좋아요/싫어요 북마크 상호작용, 댓글 기능 |
+| **NewsShorts** | 스와이프 형식의 뉴스 요약 카드, 댓글 기능, 각종 상호작용 |
+| **Community** | 게시글 및 댓글 작성 조회, 전문가/일반 분리 |
+| **Bookmark** | 북마크 뉴스 조회, 북마크 해제 |
+| **Profile** |  프로필 초기 설정, 프로필 조회 및 변경, 내가 쓴 게시글 및 댓글 조회 |
+
+---
